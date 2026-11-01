@@ -8,23 +8,16 @@ import android.widget.TextView;
 
 import com.bumptech.glide.Glide;
 import com.bumptech.glide.request.RequestOptions;
-import com.google.gson.Gson;
 import com.yt.downloader.R;
 import com.yt.downloader.spogify.Utils.FormatCountUtil;
+import com.yt.downloader.spogify.Utils.Image.DeezerApiArtist;
 import com.yt.downloader.spogify.base.BaseQuickAdapter;
 import com.yt.downloader.spogify.base.BaseViewHolder;
-import com.yt.downloader.spogify.mvp.bean.DeezerArtistBean;
-import com.yt.downloader.spogify.mvp.bean.TopArtistBean;
 import com.yt.downloader.spogify.mvp.bean.TopTrackBean;
 import com.yt.downloader.spogify.ui.activity.TrackInfoActivity;
 
-import java.io.InputStreamReader;
-import java.net.HttpURLConnection;
-import java.net.URL;
-import java.net.URLEncoder;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.Executors;
 
 public class TopTrackAdapter extends BaseQuickAdapter<TopTrackBean.Track, BaseViewHolder> {
 
@@ -84,36 +77,16 @@ public class TopTrackAdapter extends BaseQuickAdapter<TopTrackBean.Track, BaseVi
     }
 
     private void fetchDeezerImage(String artistName, ImageView imageView) {
-        Executors.newSingleThreadExecutor().execute(() -> {
-            try {
-                String query = URLEncoder.encode(artistName, "UTF-8");
-                String deezerUrl = "https://api.deezer.com/search/artist?q=" + query;
-
-                URL url = new URL(deezerUrl);
-                HttpURLConnection connection = (HttpURLConnection) url.openConnection();
-                connection.setRequestMethod("GET");
-                connection.setConnectTimeout(5000);
-                connection.setReadTimeout(5000);
-
-                if (connection.getResponseCode() == HttpURLConnection.HTTP_OK) {
-                    InputStreamReader reader = new InputStreamReader(connection.getInputStream());
-                    DeezerArtistBean response = new Gson().fromJson(reader, DeezerArtistBean.class);
-                    reader.close();
-
-                    if (response != null && response.getData() != null && !response.getData().isEmpty()) {
-                        String imageUrl = response.getData().get(0).getPictureBig();
-
-                        imageCache.put(artistName, imageUrl);
-
-                        imageView.post(() -> {
-                            if (artistName.equals(imageView.getTag())) {
-                                loadImage(imageView, imageUrl);
-                            }
-                        });
-                    }
+        DeezerApiArtist.fetchArtistImageUrl(artistName, new DeezerApiArtist.Callback() {
+            @Override
+            public void onSuccess(String imageUrl) {
+                if (artistName.equals(imageView.getTag())) {
+                    loadImage(imageView, imageUrl);
                 }
-                connection.disconnect();
-            } catch (Exception e) {
+            }
+
+            @Override
+            public void onFailure(Exception e) {
                 e.printStackTrace();
             }
         });

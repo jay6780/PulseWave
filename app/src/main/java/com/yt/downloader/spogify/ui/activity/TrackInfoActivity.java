@@ -10,6 +10,7 @@ import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
 import android.text.TextUtils;
+import android.util.Log;
 import android.view.View;
 import android.widget.ImageView;
 import android.widget.Toast;
@@ -21,20 +22,19 @@ import androidx.recyclerview.widget.LinearLayoutManager;
 
 import com.bumptech.glide.Glide;
 import com.bumptech.glide.request.RequestOptions;
-import com.google.gson.Gson;
 import com.kaopiz.kprogresshud.KProgressHUD;
 import com.yt.downloader.R;
 import com.yt.downloader.databinding.ActivityTrackInfoBinding;
 import com.yt.downloader.spogify.Retrofit.AppConstant;
-import com.yt.downloader.spogify.Utils.DownloadTrackModel;
-import com.yt.downloader.spogify.Utils.FavoriteDatabaseHelper;
-import com.yt.downloader.spogify.Utils.FollowDatabaseHelper;
+import com.yt.downloader.spogify.Utils.Image.DeezerApiArtist;
+import com.yt.downloader.spogify.Utils.download.DownloadTrackModel;
+import com.yt.downloader.spogify.Utils.db.FavoriteDatabaseHelper;
+import com.yt.downloader.spogify.Utils.db.FollowDatabaseHelper;
 import com.yt.downloader.spogify.Utils.FormatCountUtil;
-import com.yt.downloader.spogify.Utils.PlayerState;
+import com.yt.downloader.spogify.Utils.lyrics.PlayerState;
 import com.yt.downloader.spogify.Utils.WindowUtils;
 import com.yt.downloader.spogify.Utils.fileUtils.FilesExtractor;
 import com.yt.downloader.spogify.Utils.fileUtils.VideoFile;
-import com.yt.downloader.spogify.mvp.bean.DeezerArtistBean;
 import com.yt.downloader.spogify.mvp.bean.FavoriteTrack;
 import com.yt.downloader.spogify.mvp.bean.Mp3downloadBean;
 import com.yt.downloader.spogify.mvp.bean.TrackInfoBean;
@@ -46,20 +46,15 @@ import com.yt.downloader.spogify.mvp.presenter.TrackInfoPresenter;
 import com.yt.downloader.spogify.ui.adapter.TopTrackInfoAdapter;
 
 import java.io.File;
-import java.io.InputStreamReader;
-import java.net.HttpURLConnection;
-import java.net.URL;
-import java.net.URLEncoder;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.Executors;
-import com.yt.downloader.spogify.Utils.LyricsDatabaseHelper;
 
-public class TrackInfoActivity extends MiniPlayerActivity
-        implements View.OnClickListener, TrackInfoContract.View, MusicListContract.View {
+import com.yt.downloader.spogify.Utils.db.LyricsDatabaseHelper;
+
+public class TrackInfoActivity extends MiniPlayerActivity implements View.OnClickListener, TrackInfoContract.View, MusicListContract.View {
 
     private ActivityTrackInfoBinding binding;
     private String artistName;
@@ -83,21 +78,16 @@ public class TrackInfoActivity extends MiniPlayerActivity
     private FilesExtractor filesExtractor;
     private KProgressHUD hud;
     private boolean mainDestroyed = false;
-    private final ActivityResultLauncher<String> storagePermissionLauncher =
-            registerForActivityResult(new ActivityResultContracts.RequestPermission(), isGranted -> {
-                if (isGranted) {
-                    if (currentDownloadTrack != null) {
-                        startDownloadFlow(currentDownloadTrack);
-                    }
-                } else {
-                    Toast.makeText(this, "Permission required to save audio to Music folder", LENGTH_SHORT).show();
-                }
-            });
-
-    private final ActivityResultLauncher<String> notificationPermissionLauncher =
-            registerForActivityResult(new ActivityResultContracts.RequestPermission(), isGranted -> {
-                // Permission outcome handled
-            });
+    private String lastHeaderUrl = "";
+    private final ActivityResultLauncher<String> storagePermissionLauncher = registerForActivityResult(new ActivityResultContracts.RequestPermission(), isGranted -> {
+        if (isGranted) {
+            if (currentDownloadTrack != null) {
+                startDownloadFlow(currentDownloadTrack);
+            }
+        } else {
+            Toast.makeText(this, "Permission required to save audio to Music folder", LENGTH_SHORT).show();
+        }
+    });
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -132,20 +122,17 @@ public class TrackInfoActivity extends MiniPlayerActivity
             binding.tvArtistName.setText(name);
             binding.tvToolbarTitle.setText(name);
         }
-
-        checkNotificationPermission();
         initAppBarLayoutScrollListener();
         initRecycler();
 
         bindMiniPlayer(binding.layoutMiniPlayer);
 
         updateFollowButtonUI();
-        hud = KProgressHUD.create(this)
-                .setStyle(KProgressHUD.Style.SPIN_INDETERMINATE)
-                .setLabel("Please wait");
+        hud = KProgressHUD.create(this).setStyle(KProgressHUD.Style.SPIN_INDETERMINATE).setLabel("Please wait");
         trackInfoPresenter = new TrackInfoPresenter(this);
         musicListPresenter = new MusicListPresenter(this);
         lyricsDatabaseHelper = new LyricsDatabaseHelper(this);
+
         if (isFromDownload) {
             loadDownloadedTracksOnly();
         } else if (isFromFavorite) {
@@ -159,15 +146,6 @@ public class TrackInfoActivity extends MiniPlayerActivity
         binding.btnFollow.setVisibility((isFromFavorite || isFromDownload) ? View.GONE : View.VISIBLE);
         binding.ivVerified.setVisibility((isFromFavorite || isFromDownload) ? View.GONE : View.VISIBLE);
     }
-    private void checkNotificationPermission() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS)
-                    != PackageManager.PERMISSION_GRANTED) {
-                notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS);
-            }
-        }
-    }
-
     private void loadDownloadedTracksOnly() {
         ArrayList<VideoFile> downloadedFiles = filesExtractor.listVideos();
         List<TrackInfoBean.Track> trackList = new ArrayList<>();
@@ -193,7 +171,7 @@ public class TrackInfoActivity extends MiniPlayerActivity
 
         try {
             Glide.with(this).load(R.mipmap.app_logo).into(binding.ivBig);
-        }catch (Exception e){
+        } catch (Exception e) {
             e.printStackTrace();
         }
         binding.tvListeners.setText(downloadedFiles.size() + " downloaded tracks");
@@ -245,8 +223,8 @@ public class TrackInfoActivity extends MiniPlayerActivity
         currentPlayingIndex = -1;
         updateAdapterTrackState();
     }
+
     private void updateFollowButtonUI() {
-        if (binding.btnFollow == null || TextUtils.isEmpty(artistName)) return;
         boolean isFollowed = dbHelper.isArtistFollowed(artistName);
         if (isFollowed) {
             binding.btnFollow.setText("Following");
@@ -296,7 +274,6 @@ public class TrackInfoActivity extends MiniPlayerActivity
 
                 }
             } else {
-
                 isDownloadingProcess = false;
                 String searchQuery = buildSearchQuery(track);
                 musicListPresenter.getSearchListQuery(searchQuery);
@@ -328,9 +305,7 @@ public class TrackInfoActivity extends MiniPlayerActivity
 
         PlayerState state = PlayerState.get();
 
-        if (TextUtils.isEmpty(localArtist) && state.queue != null
-                && currentPlayingIndex >= 0
-                && currentPlayingIndex < state.queue.size()) {
+        if (TextUtils.isEmpty(localArtist) && state.queue != null && currentPlayingIndex >= 0 && currentPlayingIndex < state.queue.size()) {
 
             PlayerState.Item item = state.queue.get(currentPlayingIndex);
 
@@ -342,6 +317,7 @@ public class TrackInfoActivity extends MiniPlayerActivity
         playLocal(file, trackTitle, localArtist);
         updateAdapterTrackState();
     }
+
     private void playVideoInMiniPlayer(String videoId, String title, String thumbUrl) {
         String displayArtist = artistName;
         if (isFromFavorite && currentTrackList != null && currentPlayingIndex < currentTrackList.size()) {
@@ -352,6 +328,7 @@ public class TrackInfoActivity extends MiniPlayerActivity
                 displayArtist = "Favorite Track";
             }
         }
+        currentArtistImageUrl = thumbUrl;
         syncQueueToState();
         playOnline(videoId, title, displayArtist, thumbUrl);
     }
@@ -359,8 +336,7 @@ public class TrackInfoActivity extends MiniPlayerActivity
     private void checkPermissionAndDownload(TrackInfoBean.Track track) {
         currentDownloadTrack = track;
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
-            if (ContextCompat.checkSelfPermission(this, Manifest.permission.WRITE_EXTERNAL_STORAGE)
-                    != PackageManager.PERMISSION_GRANTED) {
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.WRITE_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
                 storagePermissionLauncher.launch(Manifest.permission.WRITE_EXTERNAL_STORAGE);
                 return;
             }
@@ -392,45 +368,35 @@ public class TrackInfoActivity extends MiniPlayerActivity
             return trackName + " official audio";
         }
     }
+
     private void updateBigHeaderImage(TrackInfoBean.Track track) {
         if (track == null) return;
 
         if (isFromDownload) {
             try {
                 Glide.with(this).load(R.mipmap.app_logo).into(binding.ivBig);
-            }catch (Exception e){
+            } catch (Exception e) {
                 e.printStackTrace();
             }
             return;
         }
 
-        if (isFromFavorite) {
-            FavoriteTrack favTrack = favDbHelper.getFavoriteTrackByName(track.getName());
-            if (favTrack != null && !TextUtils.isEmpty(favTrack.getImageThumb())) {
-                currentArtistImageUrl = favTrack.getImageThumb();
-                loadImage(binding.ivBig, currentArtistImageUrl);
-                return;
-            }
+        PlayerState s = PlayerState.get();
+        if (s.hasTrack && !s.isLocal && !TextUtils.isEmpty(s.thumb)) {
+            syncHeaderFromPlayerState();
+            return;
+        }
 
-            if (!TextUtils.isEmpty(track.getImageUrl())) {
-                currentArtistImageUrl = track.getImageUrl();
+        if (isFromFavorite) {
+            FavoriteTrack fav = favDbHelper.getFavoriteTrackByName(track.getName());
+            if (fav != null && !TextUtils.isEmpty(fav.getImageThumb())) {
+                currentArtistImageUrl = fav.getImageThumb();
                 loadImage(binding.ivBig, currentArtistImageUrl);
                 return;
             }
         }
-
-        String imageUrl = track.getImageUrl();
-        if (!TextUtils.isEmpty(imageUrl) && (imageUrl.startsWith("http") || imageUrl.contains("i.ytimg.com"))) {
-            currentArtistImageUrl = imageUrl;
+        if (!TextUtils.isEmpty(currentArtistImageUrl)) {
             loadImage(binding.ivBig, currentArtistImageUrl);
-        } else {
-            String trackTitle = track.getName();
-            if (imageCache.containsKey(trackTitle)) {
-                currentArtistImageUrl = imageCache.get(trackTitle);
-                loadImage(binding.ivBig, currentArtistImageUrl);
-            } else {
-                fetchDeezerImage(trackTitle, binding.ivBig);
-            }
         }
     }
 
@@ -439,9 +405,8 @@ public class TrackInfoActivity extends MiniPlayerActivity
         syncIndexFromPlayerState();
         PlayerState state = PlayerState.get();
 
-        if (!state.hasTrack || currentTrackList == null
-                || currentTrackList.isEmpty()) {
-            trackInfoAdapter.setPlayingTrackName("", false);
+        if (!state.hasTrack || currentTrackList == null || currentTrackList.isEmpty()) {
+            trackInfoAdapter.setPlayingTrackName("", false,0);
             return;
         }
         int index = findPlayingIndex();
@@ -450,29 +415,25 @@ public class TrackInfoActivity extends MiniPlayerActivity
             if (track != null && !TextUtils.isEmpty(track.getName())) {
                 currentPlayingIndex = index;
                 updateBigHeaderImage(track);
-                trackInfoAdapter.setPlayingTrackName(track.getName(), true);
+                trackInfoAdapter.setPlayingTrackName(track.getName(), true,index);
             } else {
-                trackInfoAdapter.setPlayingTrackName("", false);
+                trackInfoAdapter.setPlayingTrackName("", false,0);
             }
         } else {
-            trackInfoAdapter.setPlayingTrackName("", false);
+            trackInfoAdapter.setPlayingTrackName("", false, index);
         }
-
     }
 
     private String normalize(String s) {
-        return s == null ? "" : s.toLowerCase(Locale.ROOT)
-                .replaceAll("[^a-z0-9 ]", " ")
-                .replaceAll("\\s+", " ")
-                .trim();
+        return s == null ? "" : s.toLowerCase(Locale.ROOT).replaceAll("[^a-z0-9 ]", " ").replaceAll("\\s+", " ").trim();
     }
 
-    /** Index in THIS screen's list matching the given name, or -1. Prefers the current index on ties. */
+    /**
+     * Index in THIS screen's list matching the given name, or -1. Prefers the current index on ties.
+     */
 
     private int findTrackIndexByName(String playingName) {
-        if (TextUtils.isEmpty(playingName)
-                || currentTrackList == null
-                || currentTrackList.isEmpty()) {
+        if (TextUtils.isEmpty(playingName) || currentTrackList == null || currentTrackList.isEmpty()) {
             return -1;
         }
 
@@ -495,7 +456,9 @@ public class TrackInfoActivity extends MiniPlayerActivity
         return -1;
     }
 
-    /** Index of the currently playing track within this screen's list, or -1. */
+    /**
+     * Index of the currently playing track within this screen's list, or -1.
+     */
     private int findPlayingIndex() {
         PlayerState s = PlayerState.get();
         if (!s.hasTrack) return -1;
@@ -522,10 +485,8 @@ public class TrackInfoActivity extends MiniPlayerActivity
 
     private void initBigImage(String imageOrName) {
         if (TextUtils.isEmpty(imageOrName)) return;
-
         binding.ivBig.setTag(imageOrName);
-
-        if (imageOrName.contains("i.ytimg.com")) {
+        if (!TextUtils.isEmpty(imageOrName) && (imageOrName.startsWith("http") || imageOrName.contains("i.ytimg.com"))) {
             currentArtistImageUrl = imageOrName;
             loadImage(binding.ivBig, currentArtistImageUrl);
         } else {
@@ -533,60 +494,32 @@ public class TrackInfoActivity extends MiniPlayerActivity
                 currentArtistImageUrl = imageCache.get(imageOrName);
                 loadImage(binding.ivBig, currentArtistImageUrl);
             } else {
-                try {
-                    Glide.with(this).load(R.mipmap.app_logo).into(binding.ivBig);
-                } catch (Exception e) {
-                    e.printStackTrace();
-                }
                 fetchDeezerImage(imageOrName, binding.ivBig);
             }
         }
     }
 
     private void loadImage(ImageView imageView, String imageUrl) {
+//        Log.d("ImageUrl","val: "+imageUrl);
         try {
-            Glide.with(this)
-                    .asBitmap()
-                    .apply(new RequestOptions().placeholder(R.drawable.noimage).error(R.drawable.noimage))
-                    .load(imageUrl)
-                    .into(imageView);
+            Glide.with(this).asBitmap().apply(new RequestOptions().placeholder(R.mipmap.app_logo).error(R.mipmap.app_logo)).load(imageUrl).into(imageView);
         } catch (Exception e) {
             e.printStackTrace();
         }
     }
 
     private void fetchDeezerImage(String name, ImageView imageView) {
-        if (TextUtils.isEmpty(name)) return;
-        Executors.newSingleThreadExecutor().execute(() -> {
-            try {
-                String query = URLEncoder.encode(name, "UTF-8");
-                String deezerUrl = "https://api.deezer.com/search/artist?q=" + query;
-
-                URL url = new URL(deezerUrl);
-                HttpURLConnection connection = (HttpURLConnection) url.openConnection();
-                connection.setRequestMethod("GET");
-                connection.setConnectTimeout(5000);
-                connection.setReadTimeout(5000);
-
-                if (connection.getResponseCode() == HttpURLConnection.HTTP_OK) {
-                    InputStreamReader reader = new InputStreamReader(connection.getInputStream());
-                    DeezerArtistBean response = new Gson().fromJson(reader, DeezerArtistBean.class);
-                    reader.close();
-
-                    if (response != null && response.getData() != null && !response.getData().isEmpty()) {
-                        String imageUrl = response.getData().get(0).getPictureBig();
-                        imageCache.put(name, imageUrl);
-                        currentArtistImageUrl = imageUrl;
-
-                        imageView.post(() -> {
-                            if (name.equals(imageView.getTag())) {
-                                loadImage(imageView, imageUrl);
-                            }
-                        });
-                    }
+        DeezerApiArtist.fetchArtistImageUrl(name, new DeezerApiArtist.Callback() {
+            @Override
+            public void onSuccess(String imageUrl) {
+                currentArtistImageUrl = imageUrl;
+                if (name.equals(imageView.getTag())) {
+                    loadImage(imageView, imageUrl);
                 }
-                connection.disconnect();
-            } catch (Exception e) {
+            }
+
+            @Override
+            public void onFailure(Exception e) {
                 e.printStackTrace();
             }
         });
@@ -627,8 +560,7 @@ public class TrackInfoActivity extends MiniPlayerActivity
             return;
         }
 
-        boolean isDownloaded = filesExtractor != null
-                && filesExtractor.isFileDownloaded(activeTrack.getName());
+        boolean isDownloaded = filesExtractor != null && filesExtractor.isFileDownloaded(activeTrack.getName());
 
         if (isDownloaded || isFromDownload) {
 
@@ -636,8 +568,7 @@ public class TrackInfoActivity extends MiniPlayerActivity
 
             if (localAudio != null && localAudio.exists()) {
 
-                if (s.hasTrack && s.isLocal
-                        && TextUtils.equals(s.localPath, localAudio.getAbsolutePath())) {
+                if (s.hasTrack && s.isLocal && TextUtils.equals(s.localPath, localAudio.getAbsolutePath())) {
 
                     togglePlayPause();
 
@@ -666,16 +597,15 @@ public class TrackInfoActivity extends MiniPlayerActivity
 
     @Override
     public void showLoading() {
-        if(!isDownloadingProcess){
+        if (!isDownloadingProcess) {
             hud.show();
         }
 
     }
 
-
     @Override
     public void showError(String error) {
-        if(hud !=null){
+        if (hud != null) {
             hud.dismiss();
         }
         if (!mainDestroyed) {
@@ -683,13 +613,13 @@ public class TrackInfoActivity extends MiniPlayerActivity
 //            Log.e("LYRICS_DEBUG", "Lyrics error: " + error);
         }
     }
+
     @Override
     public void hideLoading() {
         if (hud != null && hud.isShowing()) {
             hud.dismiss();
         }
     }
-
 
     @Override
     protected void onDestroy() {
@@ -703,7 +633,7 @@ public class TrackInfoActivity extends MiniPlayerActivity
 
     @Override
     public void getSearchList(YoutubeSearchBean youtubeSearchBean) {
-        if (youtubeSearchBean != null && youtubeSearchBean.getItems() != null && youtubeSearchBean.getItems().size() !=0) {
+        if (youtubeSearchBean != null && youtubeSearchBean.getItems() != null && youtubeSearchBean.getItems().size() != 0) {
             YoutubeSearchBean.ItemsBean item = youtubeSearchBean.getItems().get(0);
             if (isDownloadingProcess && currentDownloadTrack != null) {
                 String ytUrl = "https://www.youtube.com/watch?v=" + item.getId();
@@ -718,7 +648,7 @@ public class TrackInfoActivity extends MiniPlayerActivity
 
     @Override
     public void getDownloadSuccess(Mp3downloadBean mp3downloadBean) {
-        if (mp3downloadBean != null &&  mp3downloadBean.getDownloadUrl() !=null) {
+        if (mp3downloadBean != null && mp3downloadBean.getDownloadUrl() != null) {
             isDownloadingProcess = false;
             String downloadUrl = mp3downloadBean.getDownloadUrl();
             String trackName = currentDownloadTrack != null ? currentDownloadTrack.getName() : "downloaded_track";
@@ -765,7 +695,7 @@ public class TrackInfoActivity extends MiniPlayerActivity
     @Override
     public void getArtistTrackSuccess(TrackInfoBean trackInfoBean) {
         if (!isFromFavorite && !isFromDownload && trackInfoBean != null && trackInfoBean.getTopTracks() != null && trackInfoBean.getTopTracks().getTrackList() != null) {
-            if(trackInfoBean.getTopTracks().getTrackList().size() == 0){
+            if (trackInfoBean.getTopTracks().getTrackList().size() == 0) {
                 return;
             }
             List<TrackInfoBean.Track> trackList = trackInfoBean.getTopTracks().getTrackList();
@@ -788,7 +718,7 @@ public class TrackInfoActivity extends MiniPlayerActivity
                     try {
                         totalListenersText = new FormatCountUtil().formatListenerCount(totalListeners);
                         binding.tvListeners.setText(totalListenersText);
-                    }catch (Exception e){
+                    } catch (Exception e) {
                         e.printStackTrace();
                     }
                 }
@@ -797,10 +727,12 @@ public class TrackInfoActivity extends MiniPlayerActivity
             }
         }
     }
+
     @Override
     public String getTargetActivityName() {
         return MainActivity.class.getName();
     }
+
     private void syncQueueToState() {
         if (currentTrackList == null || currentTrackList.isEmpty()) return;
         PlayerState s = PlayerState.get();
@@ -828,11 +760,11 @@ public class TrackInfoActivity extends MiniPlayerActivity
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
         if (trackInfoAdapter != null) {
-            if(isFromDownload){
+            if (isFromDownload) {
                 loadDownloadedTracksOnly();
                 trackInfoAdapter.onDeleteMusicResult(requestCode, resultCode);
-            }else{
-                if(currentTrackList == null){
+            } else {
+                if (currentTrackList == null) {
                     return;
                 }
                 trackInfoAdapter.onDeleteMusicResult(requestCode, resultCode);
@@ -848,15 +780,36 @@ public class TrackInfoActivity extends MiniPlayerActivity
     }
 
     @Override
-    protected void onResume() {
-        super.onResume();
+    public void onTrackChanged() {
+        super.onTrackChanged();
+        if(!isFromDownload && !isFromFavorite){
+            syncHeaderFromPlayerState();
+        }
         updateAdapterTrackState();
     }
 
     @Override
-    public void onTrackChanged() {;
+    protected void onResume() {
+        super.onResume();
+        if(!isFromDownload && !isFromFavorite){
+            syncHeaderFromPlayerState();
+        }
         updateAdapterTrackState();
     }
+    private void syncHeaderFromPlayerState() {
+        if (binding == null || isFromDownload) return;
+
+        PlayerState s = PlayerState.get();
+        if (!s.hasTrack || s.isLocal || TextUtils.isEmpty(s.thumb)) return;
+
+        currentArtistImageUrl = s.thumb;
+
+        if (!s.thumb.equals(lastHeaderUrl)) {
+            lastHeaderUrl = s.thumb;
+            loadImage(binding.ivBig, s.thumb);
+        }
+    }
+
     private void syncIndexFromPlayerState() {
         int idx = findPlayingIndex();
         if (idx >= 0 && idx != currentPlayingIndex) {

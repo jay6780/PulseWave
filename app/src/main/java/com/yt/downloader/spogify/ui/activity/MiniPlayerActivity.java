@@ -24,9 +24,9 @@ import com.pierfrancescosoffritti.androidyoutubeplayer.core.player.views.YouTube
 import com.yt.downloader.R;
 import com.yt.downloader.databinding.LayoutMiniPlayerBinding;
 import com.yt.downloader.spogify.Service.PlaybackService;
-import com.yt.downloader.spogify.Utils.KaraokeLyricsController;
-import com.yt.downloader.spogify.Utils.LocalAudioPlayer;
-import com.yt.downloader.spogify.Utils.PlayerState;
+import com.yt.downloader.spogify.Utils.lyrics.KaraokeLyricsController;
+import com.yt.downloader.spogify.Utils.lyrics.LocalAudioPlayer;
+import com.yt.downloader.spogify.Utils.lyrics.PlayerState;
 import com.yt.downloader.spogify.mvp.bean.YoutubeSearchBean;
 import com.yt.downloader.spogify.mvp.contract.MusicListContract;
 import com.yt.downloader.spogify.mvp.presenter.MusicListPresenter;
@@ -185,41 +185,16 @@ public abstract class MiniPlayerActivity extends AppCompatActivity {
     // Hook to manage lyrics visibility and lines
     public void onTrackChanged() {
         PlayerState s = PlayerState.get();
-        if (mini != null && mini.tvMiniLyrics != null) {
-            if (s.parsedLyrics != null && !s.parsedLyrics.isEmpty()) {
-                mini.tvMiniLyrics.setVisibility(View.VISIBLE);
-                if (karaokeLyricsController != null) {
-                    karaokeLyricsController.setLines(s.parsedLyrics);
-                }
-            } else {
-                mini.tvMiniLyrics.setVisibility(View.GONE);
-                if (karaokeLyricsController != null) {
-                    karaokeLyricsController.clear();
-                }
+        if (s.parsedLyrics != null && !s.parsedLyrics.isEmpty()) {
+            if (karaokeLyricsController != null) {
+                karaokeLyricsController.setLines(s.parsedLyrics);
+            }
+        } else {
+            if (karaokeLyricsController != null) {
+                karaokeLyricsController.clear();
             }
         }
     }
-
-    /**
-     * Call this from whatever loads lyrics (optional, avoids waiting for the 500ms poll).
-     * Set s.lyricsDurationSec BEFORE s.parsedLyrics, then call this on the UI thread.
-     */
-    public static void notifyLyricsLoaded() {
-        MiniPlayerActivity owner = playbackOwner.get();
-        MiniPlayerActivity last = lastActive.get();
-        if (owner != null && !owner.isDestroyed()) {
-            owner.onTrackChanged();
-            owner.applyLyricsOffset();
-        }
-        if (last != null && last != owner && !last.isDestroyed()) {
-            last.onTrackChanged();
-            last.applyLyricsOffset();
-        }
-    }
-
-    // ---------------------------------------------------------------
-    // Ownership helpers
-    // ---------------------------------------------------------------
 
     private boolean isAlive(MiniPlayerActivity a) {
         return a != null && !a.isDestroyed();
@@ -314,9 +289,6 @@ public abstract class MiniPlayerActivity extends AppCompatActivity {
      */
     public void bindMiniPlayer(LayoutMiniPlayerBinding miniBinding) {
         this.mini = miniBinding;
-        if (mini.tvMiniLyrics != null) {
-            karaokeLyricsController = new KaraokeLyricsController(mini.tvMiniLyrics);
-        }
         initMiniPlayer();
         registerControlReceiver();
         restoreFromState();
@@ -399,12 +371,6 @@ public abstract class MiniPlayerActivity extends AppCompatActivity {
         View.OnClickListener openFull = v -> openNowPlaying();
         mini.llHide.setOnClickListener(openFull);
         mini.rlMiniPlayer.setOnClickListener(openFull);
-
-        mini.llHide.setOnLongClickListener(v -> {
-            boolean visible = mini.tvMiniLyrics.getVisibility() == View.VISIBLE;
-            mini.tvMiniLyrics.setVisibility(visible ? View.GONE : View.VISIBLE);
-            return true;
-        });
 
         mini.ivMiniPrevious.setOnClickListener(v -> onPreviousTrackRequested());
 
@@ -590,7 +556,6 @@ public abstract class MiniPlayerActivity extends AppCompatActivity {
             s.lyricsOffsetMs = 0;
             s.durationSec = 0f;
             if (karaokeLyricsController != null) karaokeLyricsController.clear();
-            if (mini.tvMiniLyrics != null) mini.tvMiniLyrics.setVisibility(View.GONE);
         }
 
         mini.rlMiniPlayer.setVisibility(View.VISIBLE);
@@ -648,7 +613,6 @@ public abstract class MiniPlayerActivity extends AppCompatActivity {
             s.lyricsDurationSec = 0f;
             s.lyricsOffsetMs = 0;
             if (karaokeLyricsController != null) karaokeLyricsController.clear();
-            if (mini.tvMiniLyrics != null) mini.tvMiniLyrics.setVisibility(View.GONE);
         }
 
         if (miniPlayer != null) {
@@ -730,22 +694,16 @@ public abstract class MiniPlayerActivity extends AppCompatActivity {
      */
     public void restoreFromState() {
         PlayerState s = PlayerState.get();
-
-        // Sync lyrics visibility on restore
-        if (mini != null && mini.tvMiniLyrics != null) {
-            if (s.parsedLyrics != null && !s.parsedLyrics.isEmpty()) {
-                mini.tvMiniLyrics.setVisibility(View.VISIBLE);
-                if (karaokeLyricsController != null) {
-                    karaokeLyricsController.setLines(s.parsedLyrics);
-                }
-            } else {
-                mini.tvMiniLyrics.setVisibility(View.GONE);
-                if (karaokeLyricsController != null) {
-                    karaokeLyricsController.clear();
-                }
+        if (s.parsedLyrics != null && !s.parsedLyrics.isEmpty()) {
+            if (karaokeLyricsController != null) {
+                karaokeLyricsController.setLines(s.parsedLyrics);
             }
-        }
+        } else {
+            if (karaokeLyricsController != null) {
+                karaokeLyricsController.clear();
+            }
 
+        }
         if (mini == null || !s.hasTrack) return;
         if (s.resumeOnRestore && !isLoadedHere()) {
             s.resumeOnRestore = false;
@@ -792,23 +750,17 @@ public abstract class MiniPlayerActivity extends AppCompatActivity {
 
         PlayerState s = PlayerState.get();
         if (!s.hasTrack) return;
-
         if (mini.rlMiniPlayer.getBackground() != null) {
-            mini.rlMiniPlayer.getBackground().mutate()
-                    .setTint(NowPlayingDialog.colorFor(s.title));
+            mini.rlMiniPlayer.getBackground().mutate().setTint(NowPlayingDialog.colorFor(s.title));
         }
 
-        if (mini.tvMiniLyrics != null) {
-            if (s.parsedLyrics != null && !s.parsedLyrics.isEmpty()) {
-                mini.tvMiniLyrics.setVisibility(View.VISIBLE);
-                if (karaokeLyricsController != null) {
-                    karaokeLyricsController.setLines(s.parsedLyrics);
-                }
-            } else {
-                mini.tvMiniLyrics.setVisibility(View.GONE);
-                if (karaokeLyricsController != null) {
-                    karaokeLyricsController.clear();
-                }
+        if (s.parsedLyrics != null && !s.parsedLyrics.isEmpty()) {
+            if (karaokeLyricsController != null) {
+                karaokeLyricsController.setLines(s.parsedLyrics);
+            }
+        } else {
+            if (karaokeLyricsController != null) {
+                karaokeLyricsController.clear();
             }
         }
 

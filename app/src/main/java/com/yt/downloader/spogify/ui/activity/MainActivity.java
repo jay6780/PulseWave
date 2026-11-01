@@ -19,21 +19,15 @@ import androidx.lifecycle.Lifecycle;
 
 import com.yt.downloader.R;
 import com.yt.downloader.databinding.ActivityMainBinding;
-import com.yt.downloader.spogify.LyricsEvent;
-import com.yt.downloader.spogify.Utils.LrcParser;
-import com.yt.downloader.spogify.Utils.PlayerState;
-import com.yt.downloader.spogify.mvp.bean.LyricsBean;
+import com.yt.downloader.spogify.Utils.lyrics.LrcParser;
+import com.yt.downloader.spogify.Utils.lyrics.PlayerState;
 import com.yt.downloader.spogify.ui.fragment.HomeFragment;
 import com.yt.downloader.spogify.ui.fragment.PlayListFragment;
 import com.yt.downloader.spogify.ui.fragment.SearchFragment;
 
 import java.util.ArrayList;
 
-import com.yt.downloader.spogify.Utils.LyricsDatabaseHelper;
-
-import org.greenrobot.eventbus.EventBus;
-import org.greenrobot.eventbus.Subscribe;
-import org.greenrobot.eventbus.ThreadMode;
+import com.yt.downloader.spogify.Utils.db.LyricsDatabaseHelper;
 
 public class MainActivity extends MiniPlayerActivity implements View.OnClickListener {
 
@@ -189,7 +183,6 @@ public class MainActivity extends MiniPlayerActivity implements View.OnClickList
         state.lyricsDurationSec = 0f;
         if (karaokeLyricsController != null) {
             karaokeLyricsController.clear();
-            mini.tvMiniLyrics.setVisibility(View.GONE);
         }
     }
 
@@ -231,9 +224,10 @@ public class MainActivity extends MiniPlayerActivity implements View.OnClickList
                 state.setDuration(cached.duration);
                 state.lyricsDurationSec = (float) cached.duration;
                 super.onTrackChanged();
-                return;
+            }else{
+                clearCurrentLyrics();
             }
-            clearCurrentLyrics();
+
         }
 
     }

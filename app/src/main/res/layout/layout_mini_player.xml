@@ -12,26 +12,11 @@
     android:focusable="true"
     android:visibility="gone">
 
-    <TextView
-        android:id="@+id/tv_mini_lyrics"
-        android:layout_width="match_parent"
-        android:layout_height="20dp"
-        android:layout_alignParentTop="true"
-        android:gravity="center"
-        android:textColor="#B3B3B3"
-        android:textSize="13sp"
-        android:textStyle="bold"
-        android:visibility="gone"
-        app:autoSizeTextType="uniform"
-        app:autoSizeMinTextSize="9sp"
-        app:autoSizeMaxTextSize="13sp"
-        app:autoSizeStepGranularity="1sp" />
 
     <FrameLayout
         android:id="@+id/fl_mini_player_container"
         android:layout_width="48dp"
         android:layout_height="48dp"
-        android:layout_below="@id/tv_mini_lyrics"
         android:layout_marginTop="2dp">
 
         <com.pierfrancescosoffritti.androidyoutubeplayer.core.player.views.YouTubePlayerView
@@ -62,7 +47,6 @@
         android:layout_width="wrap_content"
         android:layout_height="48dp"
         android:layout_alignParentEnd="true"
-        android:layout_below="@id/tv_mini_lyrics"
         android:layout_marginTop="2dp"
         android:gravity="center_vertical"
         android:orientation="horizontal">
@@ -106,7 +90,6 @@
         android:id="@+id/ll_hide"
         android:layout_width="match_parent"
         android:layout_height="48dp"
-        android:layout_below="@id/tv_mini_lyrics"
         android:layout_marginTop="2dp"
         android:layout_toEndOf="@id/fl_mini_player_container"
         android:layout_toStartOf="@id/ll_mini_controls"

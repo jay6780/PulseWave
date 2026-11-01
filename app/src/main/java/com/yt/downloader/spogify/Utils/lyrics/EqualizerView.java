@@ -1,4 +1,4 @@
-package com.yt.downloader.spogify.Utils;
+package com.yt.downloader.spogify.Utils.lyrics;
 
 import android.content.Context;
 import android.graphics.Canvas;

@@ -1,4 +1,4 @@
-package com.yt.downloader.spogify.Utils;
+package com.yt.downloader.spogify.Utils.db;
 
 import android.content.ContentValues;
 import android.content.Context;

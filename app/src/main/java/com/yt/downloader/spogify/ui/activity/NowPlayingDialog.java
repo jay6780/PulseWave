@@ -13,7 +13,6 @@ import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.Window;
-import android.widget.ProgressBar;
 import android.widget.SeekBar;
 import android.widget.TextView;
 
@@ -25,13 +24,14 @@ import androidx.recyclerview.widget.LinearSmoothScroller;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.yt.downloader.databinding.DialogNowPlayingBinding;
-import com.yt.downloader.spogify.Utils.LrcParser;
-import com.yt.downloader.spogify.Utils.LyricsDatabaseHelper;
-import com.yt.downloader.spogify.Utils.PlayerState;
+import com.yt.downloader.spogify.Utils.db.LyricsDatabaseHelper;
+import com.yt.downloader.spogify.Utils.lyrics.LrcParser;
+import com.yt.downloader.spogify.Utils.lyrics.PlayerState;
 import com.yt.downloader.spogify.mvp.bean.LyricsBean;
 import com.yt.downloader.spogify.mvp.contract.LyricsContract;
 import com.yt.downloader.spogify.mvp.presenter.LyricsPresenter;
 
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Locale;
@@ -56,7 +56,8 @@ public class NowPlayingDialog extends DialogFragment implements LyricsContract.V
     private LyricsPresenter lyricsPresenter;
     private LyricsDatabaseHelper lyricsDatabaseHelper;
     private String lastLoadedTrackKey = "";
-
+    private String reqArtist = "";
+    private String reqTitle = "";
     private MiniPlayerActivity host() {
         return (MiniPlayerActivity) requireActivity();
     }
@@ -214,7 +215,7 @@ public class NowPlayingDialog extends DialogFragment implements LyricsContract.V
         String title = s.title;
         String artist = s.artist == null ? "" : s.artist;
 
-        if (s.queue != null && s.queueIndex >= 0 && s.queueIndex < s.queue.size()) {
+        if (s.queueIndex >= 0 && s.queueIndex < s.queue.size()) {
             PlayerState.Item item = s.queue.get(s.queueIndex);
             if (item != null) {
                 if (!TextUtils.isEmpty(item.name)) title = item.name;
@@ -229,24 +230,29 @@ public class NowPlayingDialog extends DialogFragment implements LyricsContract.V
             if (cached == null) {
                 cached = lyricsDatabaseHelper.getLyricsByMusicName(musicTitle);
             }
-
-            if (cached != null && !TextUtils.isEmpty(cached.syncedLyrics)) {
-                s.parsedLyrics = LrcParser.parse(cached.syncedLyrics);
-                s.setLyrics(cached.syncedLyrics);
-                s.setDuration(cached.duration);
-                s.lyricsDurationSec = (float) cached.duration;
-                hideLoading();
+            if (cached == null) {
+                clearCurrentLyrics();
+                if (isNetworkAvailable() && lyricsPresenter != null) {
+                    showLoading();
+                    int durationInt = (int) s.durationSec;
+                    reqArtist = artist;
+                    reqTitle = musicTitle;
+                    lyricsPresenter.getLyrics(musicTitle, artist, durationInt);
+                } else {
+                    hideLoading();
+                }
                 return;
             }
+            s.parsedLyrics = LrcParser.parse(cached.syncedLyrics);
+            s.setLyrics(cached.syncedLyrics);
+            s.setDuration(cached.duration);
+            s.lyricsDurationSec = (float) cached.duration;
         }
-
-        if (isNetworkAvailable() && lyricsPresenter != null) {
-            showLoading();
-            int durationInt = (int) s.durationSec;
-            lyricsPresenter.getLyrics(musicTitle, artist, durationInt);
-        } else {
-            hideLoading();
-        }
+    }
+    private void clearCurrentLyrics() {
+        PlayerState state = PlayerState.get();
+        state.parsedLyrics = new ArrayList<>();
+        state.lyricsDurationSec = 0f;
     }
     private String cleanMusicTitle(String title) {
         if (TextUtils.isEmpty(title)) return "";
@@ -278,8 +284,8 @@ public class NowPlayingDialog extends DialogFragment implements LyricsContract.V
         double duration = bean.getDuration();
         PlayerState s = PlayerState.get();
 
-        if (lyricsDatabaseHelper != null && !TextUtils.isEmpty(s.title)) {
-            lyricsDatabaseHelper.saveLyrics(s.artist, cleanMusicTitle(s.title), syncedLyrics, duration);
+        if (lyricsDatabaseHelper != null) {
+            lyricsDatabaseHelper.saveLyrics(reqArtist, reqTitle, syncedLyrics, duration);
         }
 
         s.parsedLyrics = LrcParser.parse(syncedLyrics);

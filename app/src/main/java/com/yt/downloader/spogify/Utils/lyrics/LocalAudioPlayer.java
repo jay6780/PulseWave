@@ -1,5 +1,5 @@
 
-package com.yt.downloader.spogify.Utils;
+package com.yt.downloader.spogify.Utils.lyrics;
 
 import android.media.AudioAttributes;
 import android.media.MediaPlayer;

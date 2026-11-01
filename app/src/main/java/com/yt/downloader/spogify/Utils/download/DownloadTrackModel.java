@@ -1,4 +1,4 @@
-package com.yt.downloader.spogify.Utils;
+package com.yt.downloader.spogify.Utils.download;
 
 import android.content.ContentResolver;
 import android.content.ContentValues;

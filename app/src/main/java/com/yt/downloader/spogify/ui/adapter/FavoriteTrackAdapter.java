@@ -6,20 +6,14 @@ import android.widget.TextView;
 
 import com.bumptech.glide.Glide;
 import com.bumptech.glide.request.RequestOptions;
-import com.google.gson.Gson;
 import com.yt.downloader.R;
+import com.yt.downloader.spogify.Utils.Image.DeezerApiArtist;
 import com.yt.downloader.spogify.base.BaseQuickAdapter;
 import com.yt.downloader.spogify.base.BaseViewHolder;
-import com.yt.downloader.spogify.mvp.bean.DeezerTrackBean;
 import com.yt.downloader.spogify.mvp.bean.FavoriteTrack;
 
-import java.io.InputStreamReader;
-import java.net.HttpURLConnection;
-import java.net.URL;
-import java.net.URLEncoder;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.Executors;
 
 public class FavoriteTrackAdapter extends BaseQuickAdapter<FavoriteTrack, BaseViewHolder> {
 
@@ -71,40 +65,15 @@ public class FavoriteTrackAdapter extends BaseQuickAdapter<FavoriteTrack, BaseVi
     }
 
     private void fetchDeezerTrackCover(String trackTitle, ImageView imageView) {
-        Executors.newSingleThreadExecutor().execute(() -> {
-            try {
-                String query = URLEncoder.encode(trackTitle, "UTF-8");
-                String deezerUrl = "https://api.deezer.com/search/track?q=" + query;
-
-                URL url = new URL(deezerUrl);
-                HttpURLConnection connection = (HttpURLConnection) url.openConnection();
-                connection.setRequestMethod("GET");
-                connection.setConnectTimeout(5000);
-                connection.setReadTimeout(5000);
-
-                if (connection.getResponseCode() == HttpURLConnection.HTTP_OK) {
-                    InputStreamReader reader = new InputStreamReader(connection.getInputStream());
-                    DeezerTrackBean response = new Gson().fromJson(reader, DeezerTrackBean.class);
-                    reader.close();
-
-                    if (response != null && response.getData() != null && !response.getData().isEmpty()) {
-                        DeezerTrackBean.TrackData firstTrack = response.getData().get(0);
-                        if (firstTrack.getAlbum() != null) {
-                            String imageUrl = firstTrack.getAlbum().getCoverBig();
-                            if (imageUrl != null) {
-                                imageCache.put(trackTitle, imageUrl);
-
-                                imageView.post(() -> {
-                                    if (trackTitle.equals(imageView.getTag())) {
-                                        loadImage(imageView, imageUrl);
-                                    }
-                                });
-                            }
-                        }
-                    }
+        DeezerApiArtist.fetchArtistImageUrl(trackTitle, new DeezerApiArtist.Callback() {
+            @Override
+            public void onSuccess(String imageUrl) {
+                if (trackTitle.equals(imageView.getTag())) {
+                    loadImage(imageView, imageUrl);
                 }
-                connection.disconnect();
-            } catch (Exception e) {
+            }
+            @Override
+            public void onFailure(Exception e) {
                 e.printStackTrace();
             }
         });

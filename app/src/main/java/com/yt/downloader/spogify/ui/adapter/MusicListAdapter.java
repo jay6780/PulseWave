@@ -11,7 +11,7 @@ import com.bumptech.glide.load.resource.bitmap.CenterCrop;
 import com.bumptech.glide.load.resource.bitmap.RoundedCorners;
 import com.bumptech.glide.request.RequestOptions;
 import com.yt.downloader.R;
-import com.yt.downloader.spogify.Utils.FavoriteDatabaseHelper;
+import com.yt.downloader.spogify.Utils.db.FavoriteDatabaseHelper;
 import com.yt.downloader.spogify.base.BaseQuickAdapter;
 import com.yt.downloader.spogify.base.BaseViewHolder;
 import com.yt.downloader.spogify.mvp.bean.SearchTotalBean;

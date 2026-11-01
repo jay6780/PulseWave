@@ -11,25 +11,21 @@ import android.widget.Toast;
 
 import com.bumptech.glide.Glide;
 import com.bumptech.glide.request.RequestOptions;
-import com.google.gson.Gson;
 import com.yt.downloader.R;
-import com.yt.downloader.spogify.Utils.EqualizerView;
-import com.yt.downloader.spogify.Utils.FavoriteDatabaseHelper;
+import com.yt.downloader.spogify.Utils.Image.DeezerApiArtist;
+import com.yt.downloader.spogify.Utils.lyrics.EqualizerView;
+import com.yt.downloader.spogify.Utils.db.FavoriteDatabaseHelper;
 import com.yt.downloader.spogify.Utils.FormatCountUtil;
 import com.yt.downloader.spogify.Utils.fileUtils.FilesExtractor;
 import com.yt.downloader.spogify.base.BaseQuickAdapter;
 import com.yt.downloader.spogify.base.BaseViewHolder;
-import com.yt.downloader.spogify.mvp.bean.DeezerTrackBean;
 import com.yt.downloader.spogify.mvp.bean.TrackInfoBean;
 
-import java.io.InputStreamReader;
-import java.net.HttpURLConnection;
-import java.net.URL;
-import java.net.URLEncoder;
 import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.Executors;
+
 import android.app.AlertDialog;
 import android.content.IntentSender;
 import android.app.RecoverableSecurityException;
@@ -56,14 +52,13 @@ public class TopTrackInfoAdapter extends BaseQuickAdapter<TrackInfoBean.Track, B
     }
 
     private OnTrackClickListener listener;
-    private OnFavoriteRemovedListener favoriteRemovedListener;
+   private OnFavoriteRemovedListener favoriteRemovedListener;
     private OnDownloadClickListener downloadClickListener;
     private String artistName = "";
     private final Map<String, String> imageCache = new ConcurrentHashMap<>();
     private final Map<String, Integer> downloadProgressMap = new ConcurrentHashMap<>();
     private FavoriteDatabaseHelper favDbHelper;
     private FilesExtractor filesExtractor;
-
     private String currentPlayingTrackName = "";
     private boolean isPlaying = false;
 
@@ -88,26 +83,43 @@ public class TopTrackInfoAdapter extends BaseQuickAdapter<TrackInfoBean.Track, B
     }
 
     public void updateDownloadProgress(String trackName, int progress) {
+        Integer previous = downloadProgressMap.get(trackName);
         if (progress >= 100) {
             downloadProgressMap.remove(trackName);
         } else {
+            if (previous != null && previous == progress) return;
             downloadProgressMap.put(trackName, progress);
         }
-        notifyDataSetChanged();
-    }
 
-    public void setPlayingTrackName(String trackName, boolean playing) {
-        if (TextUtils.equals(this.currentPlayingTrackName, trackName) && this.isPlaying == playing) {
+        List<TrackInfoBean.Track> data = getData();
+        for (int i = 0; i < data.size(); i++) {
+            if (trackName.equalsIgnoreCase(data.get(i).getName())) {
+                notifyItemChanged(i);
+                break;
+            }
+        }
+    }
+    public void setPlayingTrackName(String trackName, boolean playing, int index) {
+        String newName = trackName != null ? trackName : "";
+        if (TextUtils.equals(currentPlayingTrackName, newName) && isPlaying == playing) {
             return;
         }
-        this.currentPlayingTrackName = trackName != null ? trackName : "";
-        this.isPlaying = playing;
-
-        if (getRecyclerView() != null) {
-            getRecyclerView().post(this::notifyDataSetChanged);
-        } else {
-            notifyDataSetChanged();
+        int oldIndex = -1;
+        if (!TextUtils.isEmpty(currentPlayingTrackName)) {
+            List<TrackInfoBean.Track> data = getData();
+            for (int i = 0; i < data.size(); i++) {
+                if (currentPlayingTrackName.equalsIgnoreCase(data.get(i).getName())) {
+                    oldIndex = i;
+                    break;
+                }
+            }
         }
+
+        currentPlayingTrackName = newName;
+        isPlaying = playing;
+
+        if (oldIndex >= 0) notifyItemChanged(oldIndex);
+        if (index >= 0 && index != oldIndex) notifyItemChanged(index);
     }
 
     @SuppressLint("SetTextI18n")
@@ -240,7 +252,7 @@ public class TopTrackInfoAdapter extends BaseQuickAdapter<TrackInfoBean.Track, B
                 }catch (Exception e){
                     e.printStackTrace();
                 }
-                fetchDeezerTrackCover(trackTitle, iv_track_cover);
+                fetchDeezerTrackCover(trackTitle, iv_track_cover,item);
             }
         }
     }
@@ -402,41 +414,17 @@ public class TopTrackInfoAdapter extends BaseQuickAdapter<TrackInfoBean.Track, B
         }
     }
 
-    private void fetchDeezerTrackCover(String trackTitle, ImageView imageView) {
-        Executors.newSingleThreadExecutor().execute(() -> {
-            try {
-                String query = URLEncoder.encode(trackTitle, "UTF-8");
-                String deezerUrl = "https://api.deezer.com/search/track?q=" + query;
-
-                URL url = new URL(deezerUrl);
-                HttpURLConnection connection = (HttpURLConnection) url.openConnection();
-                connection.setRequestMethod("GET");
-                connection.setConnectTimeout(5000);
-                connection.setReadTimeout(5000);
-
-                if (connection.getResponseCode() == HttpURLConnection.HTTP_OK) {
-                    InputStreamReader reader = new InputStreamReader(connection.getInputStream());
-                    DeezerTrackBean response = new Gson().fromJson(reader, DeezerTrackBean.class);
-                    reader.close();
-
-                    if (response != null && response.getData() != null && !response.getData().isEmpty()) {
-                        DeezerTrackBean.TrackData firstTrack = response.getData().get(0);
-                        if (firstTrack.getAlbum() != null) {
-                            String imageUrl = firstTrack.getAlbum().getCoverBig();
-                            if (imageUrl != null) {
-                                imageCache.put(trackTitle, imageUrl);
-
-                                imageView.post(() -> {
-                                    if (trackTitle.equals(imageView.getTag())) {
-                                        loadImage(imageView, imageUrl);
-                                    }
-                                });
-                            }
-                        }
-                    }
+    private void fetchDeezerTrackCover(String trackTitle, ImageView imageView,TrackInfoBean.Track item) {
+        DeezerApiArtist.fetchArtistImageUrl(trackTitle, new DeezerApiArtist.Callback() {
+            @Override
+            public void onSuccess(String imageUrl) {
+                if (trackTitle.equals(imageView.getTag())) {
+                    item.setImageUrl(imageUrl);
+                    loadImage(imageView, imageUrl);
                 }
-                connection.disconnect();
-            } catch (Exception e) {
+            }
+            @Override
+            public void onFailure(Exception e) {
                 e.printStackTrace();
             }
         });

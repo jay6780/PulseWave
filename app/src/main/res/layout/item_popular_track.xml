@@ -55,7 +55,7 @@
                 android:gravity="center_vertical"
                 android:orientation="horizontal">
 
-                <com.yt.downloader.spogify.Utils.EqualizerView
+                <com.yt.downloader.spogify.Utils.lyrics.EqualizerView
                     android:id="@+id/equalizer_view"
                     android:layout_width="14dp"
                     android:layout_height="14dp"

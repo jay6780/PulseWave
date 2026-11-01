@@ -1,4 +1,4 @@
-package com.yt.downloader.spogify;
+package com.yt.downloader.spogify.Utils.lyrics;
 
 
 import com.yt.downloader.spogify.mvp.bean.LyricsBean;

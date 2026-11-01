@@ -19,8 +19,8 @@ import androidx.recyclerview.widget.LinearLayoutManager;
 
 import com.yt.downloader.R;
 import com.yt.downloader.databinding.FragmentPlayListBinding;
-import com.yt.downloader.spogify.Utils.FavoriteDatabaseHelper;
-import com.yt.downloader.spogify.Utils.FollowDatabaseHelper;
+import com.yt.downloader.spogify.Utils.db.FavoriteDatabaseHelper;
+import com.yt.downloader.spogify.Utils.db.FollowDatabaseHelper;
 import com.yt.downloader.spogify.Utils.fileUtils.FilesExtractor;
 import com.yt.downloader.spogify.Utils.fileUtils.VideoFile;
 import com.yt.downloader.spogify.mvp.bean.FavoriteTrack;

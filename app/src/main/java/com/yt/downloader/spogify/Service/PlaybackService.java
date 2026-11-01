@@ -19,9 +19,8 @@ import androidx.annotation.Nullable;
 import androidx.core.app.NotificationCompat;
 
 import com.yt.downloader.R;
-import com.yt.downloader.spogify.Utils.LocalAudioPlayer;
-import com.yt.downloader.spogify.Utils.PlayerState;
-import com.yt.downloader.spogify.ui.activity.TrackInfoActivity;
+import com.yt.downloader.spogify.Utils.lyrics.LocalAudioPlayer;
+import com.yt.downloader.spogify.Utils.lyrics.PlayerState;
 import com.yt.downloader.spogify.ui.activity.VideoWatchActivity;
 
 import java.io.InputStream;

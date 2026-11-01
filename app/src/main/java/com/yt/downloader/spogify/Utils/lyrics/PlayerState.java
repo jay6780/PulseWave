@@ -1,4 +1,4 @@
-package com.yt.downloader.spogify.Utils;
+package com.yt.downloader.spogify.Utils.lyrics;
 
 import java.util.ArrayList;
 import java.util.List;
