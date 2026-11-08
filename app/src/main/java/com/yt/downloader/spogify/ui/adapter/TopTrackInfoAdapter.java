@@ -12,7 +12,7 @@ import android.widget.Toast;
 import com.bumptech.glide.Glide;
 import com.bumptech.glide.request.RequestOptions;
 import com.yt.downloader.R;
-import com.yt.downloader.spogify.Utils.Image.DeezerApiArtist;
+import com.yt.downloader.spogify.Utils.Image.DeezerApiTrack;
 import com.yt.downloader.spogify.Utils.lyrics.EqualizerView;
 import com.yt.downloader.spogify.Utils.db.FavoriteDatabaseHelper;
 import com.yt.downloader.spogify.Utils.FormatCountUtil;
@@ -240,20 +240,13 @@ public class TopTrackInfoAdapter extends BaseQuickAdapter<TrackInfoBean.Track, B
 
         if (item.getImageUrl() != null && item.getImageUrl().contains("i.ytimg.com")) {
             loadImage(iv_track_cover, item.getImageUrl());
+        } else if (!TextUtils.isEmpty(item.getImageUrl())) {
+            imageCache.put(trackTitle, item.getImageUrl());
+            loadImage(iv_track_cover, item.getImageUrl());
+        } else if (imageCache.containsKey(trackTitle)) {
+            loadImage(iv_track_cover, imageCache.get(trackTitle));
         } else {
-            if (imageCache.containsKey(trackTitle)) {
-                String cachedUrl = imageCache.get(trackTitle);
-                loadImage(iv_track_cover, cachedUrl);
-            } else {
-                try {
-                    Glide.with(mContext)
-                            .load(R.mipmap.app_logo)
-                            .into(iv_track_cover);
-                }catch (Exception e){
-                    e.printStackTrace();
-                }
-                fetchDeezerTrackCover(trackTitle, iv_track_cover,item);
-            }
+            fetchDeezerTrackCover(iv_track_cover, item);
         }
     }
 
@@ -414,15 +407,19 @@ public class TopTrackInfoAdapter extends BaseQuickAdapter<TrackInfoBean.Track, B
         }
     }
 
-    private void fetchDeezerTrackCover(String trackTitle, ImageView imageView,TrackInfoBean.Track item) {
-        DeezerApiArtist.fetchArtistImageUrl(trackTitle, new DeezerApiArtist.Callback() {
+    private void fetchDeezerTrackCover(ImageView imageView, TrackInfoBean.Track item) {
+        DeezerApiTrack.fetchArtistImageUrl(item.getName(), new DeezerApiTrack.Callback() {
             @Override
             public void onSuccess(String imageUrl) {
-                if (trackTitle.equals(imageView.getTag())) {
+                if (imageUrl != null) {
+                    imageCache.put(item.getName(), imageUrl);
                     item.setImageUrl(imageUrl);
+                }
+                if (item.getName().equals(imageView.getTag())) {
                     loadImage(imageView, imageUrl);
                 }
             }
+
             @Override
             public void onFailure(Exception e) {
                 e.printStackTrace();
@@ -431,17 +428,23 @@ public class TopTrackInfoAdapter extends BaseQuickAdapter<TrackInfoBean.Track, B
     }
 
     private void loadImage(ImageView imageView, String imageUrl) {
+        if (imageUrl == null) return;
+
+        Object currentTag = imageView.getTag(R.id.iv_track_cover);
+        if (imageUrl.equals(currentTag)) return;
+        imageView.setTag(R.id.iv_track_cover, imageUrl);
+
         try {
             Glide.with(mContext)
                     .asBitmap()
                     .apply(new RequestOptions()
-                            .placeholder(R.drawable.noimage)
-                            .error(R.drawable.noimage))
+                            .placeholder(R.mipmap.app_logo)
+                            .error(R.mipmap.app_logo)
+                            .dontAnimate())
                     .load(imageUrl)
                     .into(imageView);
-        }catch (Exception e){
+        } catch (Exception e) {
             e.printStackTrace();
         }
-
     }
 }

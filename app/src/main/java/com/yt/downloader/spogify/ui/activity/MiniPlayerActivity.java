@@ -30,6 +30,7 @@ import com.yt.downloader.spogify.Utils.lyrics.PlayerState;
 import com.yt.downloader.spogify.mvp.bean.YoutubeSearchBean;
 import com.yt.downloader.spogify.mvp.contract.MusicListContract;
 import com.yt.downloader.spogify.mvp.presenter.MusicListPresenter;
+import com.yt.downloader.spogify.ui.fragment.NowPlayingDialog;
 
 import java.io.File;
 import java.lang.ref.WeakReference;
@@ -39,10 +40,6 @@ import java.lang.ref.WeakReference;
  * Subclasses inflate their own layout, then call bindMiniPlayer(...).
  */
 public abstract class MiniPlayerActivity extends AppCompatActivity {
-
-    // Karaoke controller for the mini player lyrics view
-    protected KaraokeLyricsController karaokeLyricsController;
-
     // Which activity is actually playing right now / was resumed last.
     private static final WeakReference<MiniPlayerActivity> NONE = new WeakReference<>(null);
     private static WeakReference<MiniPlayerActivity> playbackOwner = NONE;
@@ -81,12 +78,6 @@ public abstract class MiniPlayerActivity extends AppCompatActivity {
         public void run() {
             if (mini != null && PlayerState.get().hasTrack) {
                 PlayerState s = PlayerState.get();
-
-                // Tick karaoke lyrics controller on every progress loop
-                if (karaokeLyricsController != null && karaokeLyricsController.hasLyrics()) {
-                    karaokeLyricsController.tick(s.positionSec, s.isPlaying);
-                }
-
                 String trackKey = s.isLocal
                         ? "local:" + s.localPath
                         : "online:" + s.videoId;
@@ -181,21 +172,8 @@ public abstract class MiniPlayerActivity extends AppCompatActivity {
     public String getTargetActivityName() {
         return getClass().getName();
     }
-
-    // Hook to manage lyrics visibility and lines
     public void onTrackChanged() {
-        PlayerState s = PlayerState.get();
-        if (s.parsedLyrics != null && !s.parsedLyrics.isEmpty()) {
-            if (karaokeLyricsController != null) {
-                karaokeLyricsController.setLines(s.parsedLyrics);
-            }
-        } else {
-            if (karaokeLyricsController != null) {
-                karaokeLyricsController.clear();
-            }
-        }
     }
-
     private boolean isAlive(MiniPlayerActivity a) {
         return a != null && !a.isDestroyed();
     }
@@ -404,11 +382,6 @@ public abstract class MiniPlayerActivity extends AppCompatActivity {
                     );
                 }
 
-                if (karaokeLyricsController != null
-                        && karaokeLyricsController.hasLyrics()) {
-                    karaokeLyricsController.tick(second, s.isPlaying);
-                }
-
                 sendStateToService(isPlaying);
             }
 
@@ -473,11 +446,6 @@ public abstract class MiniPlayerActivity extends AppCompatActivity {
                     mini.miniProgressBar.setProgress(
                             (int) ((currentSec / totalDurSec) * 1000)
                     );
-                }
-
-                if (karaokeLyricsController != null
-                        && karaokeLyricsController.hasLyrics()) {
-                    karaokeLyricsController.tick(currentSec, s.isPlaying);
                 }
                 applyLyricsOffset();
                 sendStateToService(isPlaying);
@@ -555,7 +523,6 @@ public abstract class MiniPlayerActivity extends AppCompatActivity {
             s.lyricsDurationSec = 0f;
             s.lyricsOffsetMs = 0;
             s.durationSec = 0f;
-            if (karaokeLyricsController != null) karaokeLyricsController.clear();
         }
 
         mini.rlMiniPlayer.setVisibility(View.VISIBLE);
@@ -612,7 +579,6 @@ public abstract class MiniPlayerActivity extends AppCompatActivity {
             s.parsedLyrics = null;
             s.lyricsDurationSec = 0f;
             s.lyricsOffsetMs = 0;
-            if (karaokeLyricsController != null) karaokeLyricsController.clear();
         }
 
         if (miniPlayer != null) {
@@ -679,31 +645,11 @@ public abstract class MiniPlayerActivity extends AppCompatActivity {
     }
 
     /**
-     * True if the online player is loaded with something that can be resumed.
-     */
-    public boolean hasOnlineTrackLoaded() {
-        return miniPlayer != null && !TextUtils.isEmpty(currentPlayingVideoId);
-    }
-
-    // ---------------------------------------------------------------
-    // Restore / resume across screens
-    // ---------------------------------------------------------------
-
-    /**
      * Sync this screen's mini player with the shared PlayerState.
      */
     public void restoreFromState() {
         PlayerState s = PlayerState.get();
-        if (s.parsedLyrics != null && !s.parsedLyrics.isEmpty()) {
-            if (karaokeLyricsController != null) {
-                karaokeLyricsController.setLines(s.parsedLyrics);
-            }
-        } else {
-            if (karaokeLyricsController != null) {
-                karaokeLyricsController.clear();
-            }
 
-        }
         if (mini == null || !s.hasTrack) return;
         if (s.resumeOnRestore && !isLoadedHere()) {
             s.resumeOnRestore = false;
@@ -754,15 +700,6 @@ public abstract class MiniPlayerActivity extends AppCompatActivity {
             mini.rlMiniPlayer.getBackground().mutate().setTint(NowPlayingDialog.colorFor(s.title));
         }
 
-        if (s.parsedLyrics != null && !s.parsedLyrics.isEmpty()) {
-            if (karaokeLyricsController != null) {
-                karaokeLyricsController.setLines(s.parsedLyrics);
-            }
-        } else {
-            if (karaokeLyricsController != null) {
-                karaokeLyricsController.clear();
-            }
-        }
 
         mini.rlMiniPlayer.setVisibility(View.VISIBLE);
         mini.tvMiniTitle.setText(s.title);
@@ -896,17 +833,15 @@ public abstract class MiniPlayerActivity extends AppCompatActivity {
     }
 
     protected void applyLyricsOffset() {
-        if (karaokeLyricsController == null) return;
         PlayerState s = PlayerState.get();
 
         long offsetMs = 0;
         if (s.lyricsDurationSec > 0 && s.durationSec > 0) {
-            float diff = s.durationSec - s.lyricsDurationSec;   // + = video longer
+            float diff = s.durationSec - s.lyricsDurationSec;
             if (Math.abs(diff) >= 0.5f && Math.abs(diff) <= 15f) {
                 offsetMs = (long) (-diff * 1000);
             }
         }
-        karaokeLyricsController.setOffsetMs(offsetMs);
         s.lyricsOffsetMs = offsetMs;
     }
 

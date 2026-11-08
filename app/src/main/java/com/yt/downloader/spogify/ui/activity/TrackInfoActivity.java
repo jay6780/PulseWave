@@ -10,7 +10,6 @@ import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
 import android.text.TextUtils;
-import android.util.Log;
 import android.view.View;
 import android.widget.ImageView;
 import android.widget.Toast;
@@ -668,9 +667,6 @@ public class TrackInfoActivity extends MiniPlayerActivity implements View.OnClic
                 @Override
                 public void onSuccess(String filePath) {
                     new Handler(Looper.getMainLooper()).post(() -> {
-                        if (trackInfoAdapter != null) {
-                            trackInfoAdapter.updateDownloadProgress(trackName, 100);
-                        }
                         Toast.makeText(TrackInfoActivity.this, "Saved to Music/downloaded_music: " + filePath, Toast.LENGTH_LONG).show();
                     });
                 }
@@ -678,9 +674,6 @@ public class TrackInfoActivity extends MiniPlayerActivity implements View.OnClic
                 @Override
                 public void onError(String error) {
                     new Handler(Looper.getMainLooper()).post(() -> {
-                        if (trackInfoAdapter != null) {
-                            trackInfoAdapter.updateDownloadProgress(trackName, 100);
-                        }
                         isDownloadingProcess = false;
                         Toast.makeText(TrackInfoActivity.this, "Download Error: " + error, LENGTH_SHORT).show();
                     });

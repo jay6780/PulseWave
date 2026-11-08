@@ -1,4 +1,4 @@
-package com.yt.downloader.spogify.ui.activity;
+package com.yt.downloader.spogify.ui.fragment;
 
 import android.content.Context;
 import android.graphics.Color;
@@ -30,6 +30,7 @@ import com.yt.downloader.spogify.Utils.lyrics.PlayerState;
 import com.yt.downloader.spogify.mvp.bean.LyricsBean;
 import com.yt.downloader.spogify.mvp.contract.LyricsContract;
 import com.yt.downloader.spogify.mvp.presenter.LyricsPresenter;
+import com.yt.downloader.spogify.ui.activity.MiniPlayerActivity;
 
 import java.util.ArrayList;
 import java.util.Collections;

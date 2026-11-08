@@ -103,6 +103,23 @@ public class PlaybackService extends Service {
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
+        if (intent == null) {
+            PlayerState s = PlayerState.get();
+            if (s.hasTrack) {
+                title = s.title;
+                videoId = s.isLocal ? "local_file" : s.videoId;
+                musicPic = s.thumb;
+                isPlaying = s.isPlaying;
+                currentPositionMs = (long) (s.positionSec * 1000);
+                durationMs = (long) (s.durationSec * 1000);
+                updateMediaSessionActivity();
+                updateMediaSessionMetadata();
+                updateMediaSessionState();
+                updateNotification();
+                loadThumbnail();
+                return START_STICKY;
+            }
+        }
         createChannel();
         if (thumbnail == null) {
             try {
@@ -286,6 +303,14 @@ public class PlaybackService extends Service {
     }
 
     private void loadThumbnail() {
+        if ("local_file".equals(videoId) || musicPic.isEmpty() && videoId.isEmpty()) {
+//            android.util.Log.d("PlaybackService", "loadThumbnail: local/empty, keeping app logo");
+            thumbnail = BitmapFactory.decodeResource(getResources(), R.mipmap.app_logo);
+            updateMediaSessionMetadata();
+            updateNotification();
+            return;
+        }
+
         final String thumbUrl = !musicPic.isEmpty()
                 ? musicPic
                 : (videoId.isEmpty() ? "" : "https://img.youtube.com/vi/" + videoId + "/hqdefault.jpg");

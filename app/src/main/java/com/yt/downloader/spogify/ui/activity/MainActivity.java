@@ -181,9 +181,6 @@ public class MainActivity extends MiniPlayerActivity implements View.OnClickList
         PlayerState state = PlayerState.get();
         state.parsedLyrics = new ArrayList<>();
         state.lyricsDurationSec = 0f;
-        if (karaokeLyricsController != null) {
-            karaokeLyricsController.clear();
-        }
     }
 
     @Override
