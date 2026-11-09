@@ -10,8 +10,8 @@ android {
         applicationId "com.yt.downloader.spofigy"
         minSdk 24
         targetSdk 35
-        versionCode 16
-        versionName "1.6"
+        versionCode 17
+        versionName "1.7"
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -23,7 +23,13 @@ android {
 
     signingConfigs {
         release {
-            storeFile file("./spogify.jks")
+            storeFile file("../spogify.jks")
+            storePassword "123456"
+            keyAlias "spogify"
+            keyPassword "123456"
+        }
+        debug {
+            storeFile file("../spogify.jks")
             storePassword "123456"
             keyAlias "spogify"
             keyPassword "123456"
@@ -37,6 +43,7 @@ android {
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
         }
         debug {
+            signingConfig signingConfigs.debug
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
         }
