@@ -52,10 +52,12 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 import com.yt.downloader.spogify.Utils.db.LyricsDatabaseHelper;
+import com.yt.downloader.spogify.ui.fragment.Bottom_settings;
 
 public class TrackInfoActivity extends MiniPlayerActivity implements View.OnClickListener, TrackInfoContract.View, MusicListContract.View {
 
     private ActivityTrackInfoBinding binding;
+    private Bottom_settings currentSheet;
     private String artistName;
     private boolean isFromFavorite = false;
     private boolean isFromDownload = false;
@@ -78,6 +80,7 @@ public class TrackInfoActivity extends MiniPlayerActivity implements View.OnClic
     private KProgressHUD hud;
     private boolean mainDestroyed = false;
     private String lastHeaderUrl = "";
+    private PlayerState.PlayMode playMode = PlayerState.PlayMode.REPEAT_ALL;
     private final ActivityResultLauncher<String> storagePermissionLauncher = registerForActivityResult(new ActivityResultContracts.RequestPermission(), isGranted -> {
         if (isGranted) {
             if (currentDownloadTrack != null) {
@@ -106,6 +109,7 @@ public class TrackInfoActivity extends MiniPlayerActivity implements View.OnClic
 
         binding.ivBack.setOnClickListener(this);
         binding.fabPlay.setOnClickListener(this);
+        binding.ivShuffle.setOnClickListener(this);
         if (binding.btnFollow != null) {
             binding.btnFollow.setOnClickListener(this);
         }
@@ -140,11 +144,16 @@ public class TrackInfoActivity extends MiniPlayerActivity implements View.OnClic
             initBigImage(artistName);
             trackInfoPresenter.getTrackArtistQuery(AppConstant.TopTracksInfo, artistName, AppConstant.Api_Key, "json");
         }
-
+        playMode = PlayerState.get().playMode;
+        initShuffleIcon();
         binding.tvVerified.setVisibility((isFromFavorite || isFromDownload) ? View.GONE : View.VISIBLE);
         binding.btnFollow.setVisibility((isFromFavorite || isFromDownload) ? View.GONE : View.VISIBLE);
         binding.ivVerified.setVisibility((isFromFavorite || isFromDownload) ? View.GONE : View.VISIBLE);
     }
+    private void initShuffleIcon() {
+        updatePlayModeIcon();
+    }
+
     private void loadDownloadedTracksOnly() {
         ArrayList<VideoFile> downloadedFiles = filesExtractor.listVideos();
         List<TrackInfoBean.Track> trackList = new ArrayList<>();
@@ -252,11 +261,10 @@ public class TrackInfoActivity extends MiniPlayerActivity implements View.OnClic
 
     private void initRecycler() {
         trackInfoAdapter = new TopTrackInfoAdapter();
-        trackInfoAdapter.setArtistName(artistName);
         binding.rvPopularTracks.setLayoutManager(new LinearLayoutManager(this));
         binding.rvPopularTracks.setAdapter(trackInfoAdapter);
         trackInfoAdapter.setEmptyView(R.layout.layout_empty_music, binding.rvPopularTracks);
-
+        trackInfoAdapter.setOnMoreClickListener((track, position) -> showBottomSheet(track));
         trackInfoAdapter.setOnTrackClickListener((track, position, isDownloaded) -> {
             currentPlayingIndex = position;
             if (isDownloaded || isFromDownload) {
@@ -277,16 +285,6 @@ public class TrackInfoActivity extends MiniPlayerActivity implements View.OnClic
                 String searchQuery = buildSearchQuery(track);
                 musicListPresenter.getSearchListQuery(searchQuery);
 
-            }
-        });
-
-        trackInfoAdapter.setOnDownloadClickListener((track, position) -> {
-            checkPermissionAndDownload(track);
-        });
-
-        trackInfoAdapter.setOnFavoriteRemovedListener(() -> {
-            if (isFromFavorite) {
-                loadFavoriteTracksOnly();
             }
         });
     }
@@ -461,9 +459,11 @@ public class TrackInfoActivity extends MiniPlayerActivity implements View.OnClic
     private int findPlayingIndex() {
         PlayerState s = PlayerState.get();
         if (!s.hasTrack) return -1;
-
-        if (s.queueIndex >= 0 && s.queueIndex < s.queue.size()) {
-            return findTrackIndexByName(s.queue.get(s.queueIndex).name);
+        if (s.queueIndex >= 0 && s.queueIndex < currentTrackList.size()
+                && s.queueIndex < s.queue.size()) {
+            String qName = normalize(s.queue.get(s.queueIndex).name);
+            String lName = normalize(currentTrackList.get(s.queueIndex).getName());
+            if (qName.equals(lName)) return s.queueIndex;
         }
         return findTrackIndexByName(s.title);
     }
@@ -532,9 +532,57 @@ public class TrackInfoActivity extends MiniPlayerActivity implements View.OnClic
             toggleFollowStatus();
         } else if (v.getId() == R.id.fab_play || v.getId() == binding.fabPlay.getId()) {
             onFabPlayClicked();
+        } else if (v.getId() == R.id.iv_shuffle) {
+            onShuffleButtonClicked();
         }
     }
 
+    private void onShuffleButtonClicked() {
+        switch (playMode) {
+            case REPEAT_ALL:
+                playMode = PlayerState.PlayMode.SHUFFLE;
+                break;
+            case SHUFFLE:
+                playMode = PlayerState.PlayMode.PLAY_ONCE;
+                break;
+            case PLAY_ONCE:
+            default:
+                playMode = PlayerState.PlayMode.REPEAT_ALL;
+                break;
+        }
+        updatePlayModeIcon();
+        applyPlayModeToPlayer();
+        Toast.makeText(this, playModeLabel(), Toast.LENGTH_SHORT).show();
+    }
+
+    private void applyPlayModeToPlayer() {
+        PlayerState.get().playMode = playMode;
+    }
+    private void updatePlayModeIcon() {
+        int iconRes;
+        switch (playMode) {
+            case SHUFFLE:
+                iconRes = R.mipmap.shuffle;
+                break;
+            case PLAY_ONCE:
+                iconRes = R.mipmap.play_once;
+                break;
+            case REPEAT_ALL:
+            default:
+                iconRes = R.mipmap.repeat;
+                break;
+        }
+        binding.ivShuffle.setImageResource(iconRes);
+    }
+
+    private String playModeLabel() {
+        switch (playMode) {
+            case SHUFFLE:    return "Shuffle";
+            case PLAY_ONCE:  return "Play once";
+            case REPEAT_ALL:
+            default:         return "Repeat all";
+        }
+    }
     private void onFabPlayClicked() {
 
         if (currentTrackList == null || currentTrackList.isEmpty()) {
@@ -591,6 +639,7 @@ public class TrackInfoActivity extends MiniPlayerActivity implements View.OnClic
         isDownloadingProcess = false;
         String searchQuery = buildSearchQuery(activeTrack);
         musicListPresenter.getSearchListQuery(searchQuery);
+        applyPlayModeToPlayer();
     }
 
 
@@ -638,7 +687,10 @@ public class TrackInfoActivity extends MiniPlayerActivity implements View.OnClic
                 String ytUrl = "https://www.youtube.com/watch?v=" + item.getId();
                 trackInfoPresenter.getDownloadQuery(ytUrl, "mp3", 128);
             } else {
-                playVideoInMiniPlayer(item.getId(), item.getTitle(), item.getThumbnail());
+                TrackInfoBean.Track listTrack = (currentPlayingIndex >= 0 && currentPlayingIndex < currentTrackList.size())
+                        ? currentTrackList.get(currentPlayingIndex) : null;
+                String displayTitle = listTrack != null ? listTrack.getName() : item.getTitle();
+                playVideoInMiniPlayer(item.getId(), displayTitle, item.getThumbnail());
             }
         } else {
             Toast.makeText(this, "Track not found on YouTube", LENGTH_SHORT).show();
@@ -667,6 +719,9 @@ public class TrackInfoActivity extends MiniPlayerActivity implements View.OnClic
                 @Override
                 public void onSuccess(String filePath) {
                     new Handler(Looper.getMainLooper()).post(() -> {
+                        if (currentSheet != null && currentSheet.isAdded()) {
+                            currentSheet.bindTrack(currentDownloadTrack, artistName);
+                        }
                         Toast.makeText(TrackInfoActivity.this, "Saved to Music/downloaded_music: " + filePath, Toast.LENGTH_LONG).show();
                     });
                 }
@@ -755,14 +810,14 @@ public class TrackInfoActivity extends MiniPlayerActivity implements View.OnClic
         if (trackInfoAdapter != null) {
             if (isFromDownload) {
                 loadDownloadedTracksOnly();
-                trackInfoAdapter.onDeleteMusicResult(requestCode, resultCode);
             } else {
                 if (currentTrackList == null) {
                     return;
                 }
-                trackInfoAdapter.onDeleteMusicResult(requestCode, resultCode);
+
                 trackInfoAdapter.setNewData(currentTrackList);
             }
+            trackInfoAdapter.onDeleteMusicResult(requestCode, resultCode);
         }
     }
 
@@ -824,4 +879,37 @@ public class TrackInfoActivity extends MiniPlayerActivity implements View.OnClic
         }
     }
 
+    private void showBottomSheet(TrackInfoBean.Track track) {
+        Bottom_settings sheet = Bottom_settings.newInstance();
+        sheet.bindTrack(track, artistName);
+        sheet.setActionListener(new Bottom_settings.BottomSheetActionListener() {
+            @Override
+            public void onFavoriteClicked(TrackInfoBean.Track t) {
+                boolean currentlyFav = favDbHelper.isTrackFavorite(t.getName());
+                if (currentlyFav) {
+                    favDbHelper.removeFavoriteTrack(t.getName());
+                    Toast.makeText(TrackInfoActivity.this, "Removed from Favorites", LENGTH_SHORT).show();
+                    if (isFromFavorite) loadFavoriteTracksOnly();
+                } else {
+                    String imageThumb = !TextUtils.isEmpty(t.getImageUrl()) ? t.getImageUrl() : "";
+                    String totalListeners = !TextUtils.isEmpty(t.getListeners())
+                            ? t.getListeners() : t.getPlaycount();
+                    favDbHelper.addFavoriteTrack(t.getName(), artistName, imageThumb, totalListeners);
+                    Toast.makeText(TrackInfoActivity.this, "Added to Favorites", LENGTH_SHORT).show();
+                }
+                trackInfoAdapter.notifyDataSetChanged();
+            }
+
+            @Override
+            public void onDownloadClicked(TrackInfoBean.Track t) {
+                if (filesExtractor.isFileDownloaded(t.getName())) {
+                    trackInfoAdapter.showDeleteDialog(t.getName());
+                } else {
+                    checkPermissionAndDownload(t);
+                }
+            }
+        });
+        sheet.show(getSupportFragmentManager(), "bottom_settings");
+        currentSheet = sheet;
+    }
 }

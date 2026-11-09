@@ -13,4 +13,14 @@
     <style name="RoundedCornerImage">
         <item name="cornerSize">8dp</item>
     </style>
+
+
+    <style name="AppBottomSheetDialogTheme" parent="Theme.Design.BottomSheetDialog">
+        <item name="bottomSheetStyle">@style/Widget.App.BottomSheet.Modal</item>
+        <item name="android:windowBackground">@android:color/transparent</item>
+    </style>
+
+    <style name="Widget.App.BottomSheet.Modal" parent="Widget.Design.BottomSheet.Modal">
+        <item name="android:background">@android:color/transparent</item>
+    </style>
 </resources>

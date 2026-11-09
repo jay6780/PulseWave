@@ -5,6 +5,7 @@ import android.graphics.Color;
 import android.text.TextUtils;
 import android.view.View;
 import android.widget.ImageView;
+import android.widget.LinearLayout;
 import android.widget.ProgressBar;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -20,6 +21,7 @@ import com.yt.downloader.spogify.Utils.fileUtils.FilesExtractor;
 import com.yt.downloader.spogify.base.BaseQuickAdapter;
 import com.yt.downloader.spogify.base.BaseViewHolder;
 import com.yt.downloader.spogify.mvp.bean.TrackInfoBean;
+import com.yt.downloader.spogify.ui.fragment.Bottom_settings;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -33,12 +35,15 @@ import android.os.Build;
 import android.provider.MediaStore;
 import android.net.Uri;
 import android.app.Activity;
+
 import java.io.File;
+
 @SuppressLint("NotifyDataSetChanged")
 public class TopTrackInfoAdapter extends BaseQuickAdapter<TrackInfoBean.Track, BaseViewHolder> {
     private static final int DELETE_REQUEST_CODE = 5012;
 
     private String pendingDeleteTrackName = "";
+
     public interface OnTrackClickListener {
         void onTrackClick(TrackInfoBean.Track track, int position, boolean isDownloaded);
     }
@@ -47,14 +52,17 @@ public class TopTrackInfoAdapter extends BaseQuickAdapter<TrackInfoBean.Track, B
         void onFavoriteRemoved();
     }
 
-    public interface OnDownloadClickListener {
-        void onDownloadClick(TrackInfoBean.Track track, int position);
+    public interface OnMoreClickListener {
+        void onMoreClick(TrackInfoBean.Track track, int position);
+    }
+
+    private OnMoreClickListener moreClickListener;
+
+    public void setOnMoreClickListener(OnMoreClickListener l) {
+        this.moreClickListener = l;
     }
 
     private OnTrackClickListener listener;
-   private OnFavoriteRemovedListener favoriteRemovedListener;
-    private OnDownloadClickListener downloadClickListener;
-    private String artistName = "";
     private final Map<String, String> imageCache = new ConcurrentHashMap<>();
     private final Map<String, Integer> downloadProgressMap = new ConcurrentHashMap<>();
     private FavoriteDatabaseHelper favDbHelper;
@@ -66,20 +74,8 @@ public class TopTrackInfoAdapter extends BaseQuickAdapter<TrackInfoBean.Track, B
         super(R.layout.item_popular_track);
     }
 
-    public void setArtistName(String artistName) {
-        this.artistName = artistName;
-    }
-
     public void setOnTrackClickListener(OnTrackClickListener listener) {
         this.listener = listener;
-    }
-
-    public void setOnFavoriteRemovedListener(OnFavoriteRemovedListener listener) {
-        this.favoriteRemovedListener = listener;
-    }
-
-    public void setOnDownloadClickListener(OnDownloadClickListener listener) {
-        this.downloadClickListener = listener;
     }
 
     public void updateDownloadProgress(String trackName, int progress) {
@@ -99,6 +95,7 @@ public class TopTrackInfoAdapter extends BaseQuickAdapter<TrackInfoBean.Track, B
             }
         }
     }
+
     public void setPlayingTrackName(String trackName, boolean playing, int index) {
         String newName = trackName != null ? trackName : "";
         if (TextUtils.equals(currentPlayingTrackName, newName) && isPlaying == playing) {
@@ -131,22 +128,18 @@ public class TopTrackInfoAdapter extends BaseQuickAdapter<TrackInfoBean.Track, B
         if (filesExtractor == null) {
             filesExtractor = new FilesExtractor(mContext);
         }
-
+        LinearLayout ll_action_buttons = helper.getView(R.id.ll_action_buttons);
         TextView tv_rank = helper.getView(R.id.tv_rank);
         TextView tv_track_title = helper.getView(R.id.tv_track_title);
         TextView tv_play_count = helper.getView(R.id.tv_play_count);
         ImageView iv_track_cover = helper.getView(R.id.iv_track_cover);
-        ImageView iv_add_favorite = helper.getView(R.id.iv_add_favorite);
-        ImageView iv_download = helper.getView(R.id.iv_download);
         ProgressBar pb_download_progress = helper.getView(R.id.pb_download_progress);
         EqualizerView equalizerView = helper.getView(R.id.equalizer_view);
 
         int position = helper.getAdapterPosition();
 
         boolean isDownloaded = filesExtractor.isFileDownloaded(item.getName());
-        boolean isCurrentPlaying = item != null
-                && !TextUtils.isEmpty(item.getName())
-                && item.getName().equalsIgnoreCase(currentPlayingTrackName);
+        boolean isCurrentPlaying = item != null && !TextUtils.isEmpty(item.getName()) && item.getName().equalsIgnoreCase(currentPlayingTrackName);
 
         if (item.getAttributes() != null) {
             tv_rank.setText(item.getAttributes().getRank());
@@ -154,9 +147,9 @@ public class TopTrackInfoAdapter extends BaseQuickAdapter<TrackInfoBean.Track, B
         tv_track_title.setText(item.getName());
         String playCount = item.getPlaycount();
 
-        if(isDownloaded){
+        if (isDownloaded) {
             tv_play_count.setText("Downloaded");
-        }else{
+        } else {
             if (playCount != null) {
                 try {
                     long count = Long.parseLong(playCount.trim());
@@ -182,45 +175,11 @@ public class TopTrackInfoAdapter extends BaseQuickAdapter<TrackInfoBean.Track, B
         }
 
 
-        if (isDownloaded) {
-            iv_download.setImageResource(R.drawable.baseline_delete_24);
-            iv_download.setColorFilter(Color.parseColor("#B3B3B3"));
-        } else {
-            iv_download.setImageResource(android.R.drawable.stat_sys_download);
-            iv_download.setColorFilter(Color.parseColor("#B3B3B3"));
-        }
-
-        boolean isFavorite = favDbHelper.isTrackFavorite(item.getName());
-        updateAddButtonIcon(iv_add_favorite, isFavorite);
-
-        iv_add_favorite.setOnClickListener(v -> {
-            boolean currentlyFav = favDbHelper.isTrackFavorite(item.getName());
-            if (currentlyFav) {
-                favDbHelper.removeFavoriteTrack(item.getName());
-                Toast.makeText(mContext, "Removed from Favorites", Toast.LENGTH_SHORT).show();
-                updateAddButtonIcon(iv_add_favorite, false);
-
-                if (favoriteRemovedListener != null) {
-                    favoriteRemovedListener.onFavoriteRemoved();
-                }
-            } else {
-                String imageThumb = !TextUtils.isEmpty(item.getImageUrl()) ? item.getImageUrl() : imageCache.getOrDefault(item.getName(), "");
-                String totalListeners = !TextUtils.isEmpty(item.getListeners()) ? item.getListeners() : item.getPlaycount();
-
-                favDbHelper.addFavoriteTrack(item.getName(), artistName, imageThumb, totalListeners);
-                Toast.makeText(mContext, "Added to Favorites", Toast.LENGTH_SHORT).show();
-                updateAddButtonIcon(iv_add_favorite, true);
-            }
+        ll_action_buttons.setOnClickListener(v -> {
+            if (moreClickListener != null) moreClickListener.onMoreClick(item, position);
         });
 
-        iv_download.setOnClickListener(v -> {
-            if (filesExtractor.isFileDownloaded(item.getName())) {
-                showDeleteDialog(item.getName());
-            } else if (downloadClickListener != null) {
-                Toast.makeText(mContext, "Downloading: " + item.getName(), Toast.LENGTH_SHORT).show();
-                downloadClickListener.onDownloadClick(item, position);
-            }
-        });
+
         if (downloadProgressMap.containsKey(item.getName())) {
             int progress = downloadProgressMap.get(item.getName());
             pb_download_progress.setVisibility(View.VISIBLE);
@@ -250,17 +209,7 @@ public class TopTrackInfoAdapter extends BaseQuickAdapter<TrackInfoBean.Track, B
         }
     }
 
-    private void updateAddButtonIcon(ImageView imageView, boolean isFavorite) {
-        if (isFavorite) {
-            imageView.setImageResource(android.R.drawable.checkbox_on_background);
-            imageView.setImageResource(android.R.drawable.ic_menu_add);
-        } else {
-            imageView.setImageResource(android.R.drawable.ic_input_add);
-            imageView.setColorFilter(Color.parseColor("#B3B3B3"));
-        }
-    }
-
-    private void showDeleteDialog(String trackName) {
+    public void showDeleteDialog(String trackName) {
         AlertDialog.Builder builder = new AlertDialog.Builder(mContext);
         View dialogView = View.inflate(mContext, R.layout.delete_notice, null);
 
@@ -312,19 +261,9 @@ public class TopTrackInfoAdapter extends BaseQuickAdapter<TrackInfoBean.Track, B
 
                 pendingDeleteTrackName = trackName;
 
-                IntentSender intentSender = MediaStore.createDeleteRequest(
-                        mContext.getContentResolver(),
-                        uris
-                ).getIntentSender();
+                IntentSender intentSender = MediaStore.createDeleteRequest(mContext.getContentResolver(), uris).getIntentSender();
 
-                ((Activity) mContext).startIntentSenderForResult(
-                        intentSender,
-                        DELETE_REQUEST_CODE,
-                        null,
-                        0,
-                        0,
-                        0
-                );
+                ((Activity) mContext).startIntentSenderForResult(intentSender, DELETE_REQUEST_CODE, null, 0, 0, 0);
 
             } catch (Exception e) {
                 e.printStackTrace();
@@ -344,24 +283,14 @@ public class TopTrackInfoAdapter extends BaseQuickAdapter<TrackInfoBean.Track, B
                 }
 
             } catch (SecurityException e) {
-                if (Build.VERSION.SDK_INT == Build.VERSION_CODES.Q
-                        && e instanceof RecoverableSecurityException
-                        && mContext instanceof Activity) {
+                if (Build.VERSION.SDK_INT == Build.VERSION_CODES.Q && e instanceof RecoverableSecurityException && mContext instanceof Activity) {
 
                     try {
                         pendingDeleteTrackName = trackName;
 
-                        RecoverableSecurityException recoverable =
-                                (RecoverableSecurityException) e;
+                        RecoverableSecurityException recoverable = (RecoverableSecurityException) e;
 
-                        ((Activity) mContext).startIntentSenderForResult(
-                                recoverable.getUserAction().getActionIntent().getIntentSender(),
-                                DELETE_REQUEST_CODE,
-                                null,
-                                0,
-                                0,
-                                0
-                        );
+                        ((Activity) mContext).startIntentSenderForResult(recoverable.getUserAction().getActionIntent().getIntentSender(), DELETE_REQUEST_CODE, null, 0, 0, 0);
 
                     } catch (IntentSender.SendIntentException ex) {
                         ex.printStackTrace();
@@ -386,10 +315,20 @@ public class TopTrackInfoAdapter extends BaseQuickAdapter<TrackInfoBean.Track, B
         Toast.makeText(mContext, "Music deleted successfully", Toast.LENGTH_SHORT).show();
 
         downloadProgressMap.remove(trackName);
-
+        dismissBottomSheet();
         notifyDataSetChanged();
     }
 
+    private void dismissBottomSheet() {
+        if (mContext instanceof androidx.fragment.app.FragmentActivity) {
+            androidx.fragment.app.FragmentManager fm =
+                    ((androidx.fragment.app.FragmentActivity) mContext).getSupportFragmentManager();
+            androidx.fragment.app.Fragment f = fm.findFragmentByTag("bottom_settings");
+            if (f instanceof Bottom_settings) {
+                ((Bottom_settings) f).dismissAllowingStateLoss();
+            }
+        }
+    }
     public void onDeleteMusicResult(int requestCode, int resultCode) {
         if (requestCode != DELETE_REQUEST_CODE) return;
 
@@ -435,14 +374,7 @@ public class TopTrackInfoAdapter extends BaseQuickAdapter<TrackInfoBean.Track, B
         imageView.setTag(R.id.iv_track_cover, imageUrl);
 
         try {
-            Glide.with(mContext)
-                    .asBitmap()
-                    .apply(new RequestOptions()
-                            .placeholder(R.mipmap.app_logo)
-                            .error(R.mipmap.app_logo)
-                            .dontAnimate())
-                    .load(imageUrl)
-                    .into(imageView);
+            Glide.with(mContext).asBitmap().apply(new RequestOptions().placeholder(R.mipmap.app_logo).error(R.mipmap.app_logo).dontAnimate()).load(imageUrl).into(imageView);
         } catch (Exception e) {
             e.printStackTrace();
         }

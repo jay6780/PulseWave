@@ -151,15 +151,46 @@ public abstract class MiniPlayerActivity extends AppCompatActivity {
      * Next pressed / track ended. Default: advance the shared queue.
      */
     public void onNextTrackRequested() {
+        advanceToNextTrack();
+    }
+
+
+    /**
+     * Advance the queue according to PlayerState.playMode.
+     * Used by both manual "Next" and automatic track-ended events.
+     */
+    private void advanceToNextTrack() {
         PlayerState s = PlayerState.get();
-        android.util.Log.d("NEXT", "owner=" + getClass().getSimpleName()
-                + " queueSize=" + s.queue.size() + " index=" + s.queueIndex);
-        playSharedQueueAt(s.queueIndex + 1);
-    }
+        int n = s.queue.size();
+        if (n == 0) return;
 
-    public void chooseNextLyrics() {
-    }
+        switch (s.playMode) {
+            case PLAY_ONCE:
+                pausePlayback();
+                isPlaying = false;
+                PlayerState.get().isPlaying = false;
+                updateMiniPlayerPlayPauseIcon();
+                sendStateToService(false);
+                return;
 
+            case SHUFFLE: {
+                if (n == 1) {
+                    playSharedQueueAt(0);
+                    return;
+                }
+                int next;
+                do {
+                    next = new java.util.Random().nextInt(n);
+                } while (next == s.queueIndex);
+                playSharedQueueAt(next);
+                return;
+            }
+
+            case REPEAT_ALL:
+            default:
+                playSharedQueueAt(s.queueIndex + 1);
+        }
+    }
     /**
      * Called whenever play/pause state changes so the subclass can update its UI.
      */
@@ -235,7 +266,7 @@ public abstract class MiniPlayerActivity extends AppCompatActivity {
             } else if (PlaybackService.ACTION_PREVIOUS.equals(action)) {
                 onPreviousTrackRequested();
             } else if (PlaybackService.ACTION_NEXT.equals(action)) {
-                onNextTrackRequested();
+                advanceToNextTrack();
             } else if (PlaybackService.ACTION_SEEK.equals(action)) {
                 if (!isLoadedHere()) return;
                 long posMs = intent.getLongExtra(PlaybackService.EXTRA_CURRENT_POSITION, 0);
@@ -354,7 +385,7 @@ public abstract class MiniPlayerActivity extends AppCompatActivity {
 
         mini.ivMiniPlayPause.setOnClickListener(v -> togglePlayPause());
 
-        mini.ivMiniNext.setOnClickListener(v -> onNextTrackRequested());
+        mini.ivMiniNext.setOnClickListener(v -> advanceToNextTrack());
 
         miniYouTubePlayerView.initialize(new AbstractYouTubePlayerListener() {
             @Override
@@ -412,7 +443,7 @@ public abstract class MiniPlayerActivity extends AppCompatActivity {
                     updateMiniPlayerPlayPauseIcon();
                     mini.miniProgressBar.setProgress(1000);
                     sendStateToService(false);
-                    onNextTrackRequested();
+                    advanceToNextTrack();
                 }
             }
         }, options);
@@ -472,7 +503,7 @@ public abstract class MiniPlayerActivity extends AppCompatActivity {
                 PlayerState.get().isPlaying = false;
 
                 updateMiniPlayerPlayPauseIcon();
-                onNextTrackRequested();
+                advanceToNextTrack();
             }
         });
     }

@@ -7,6 +7,12 @@ public class PlayerState {
     public boolean resumeOnRestore = false;
     private static final PlayerState INSTANCE = new PlayerState();
     public static PlayerState get() { return INSTANCE; }
+    public enum PlayMode {
+        PLAY_ONCE,
+        REPEAT_ALL,
+        SHUFFLE
+    }
+    public PlayMode playMode = PlayMode.REPEAT_ALL;
 
     /** One entry in the shared queue. */
     public static class Item {
