@@ -239,7 +239,7 @@ public class PlaybackService extends Service {
         if (mediaSession == null) return;
         MediaMetadataCompat.Builder builder = new MediaMetadataCompat.Builder()
                 .putString(MediaMetadataCompat.METADATA_KEY_TITLE, title)
-                .putString(MediaMetadataCompat.METADATA_KEY_ARTIST, "Spogify")
+                .putString(MediaMetadataCompat.METADATA_KEY_ARTIST, getString(R.string.app_name))
                 .putLong(MediaMetadataCompat.METADATA_KEY_DURATION, durationMs);
 
         if (thumbnail != null) {
@@ -285,7 +285,7 @@ public class PlaybackService extends Service {
 
         PendingIntent nextPi = PendingIntent.getBroadcast(this, 2, next, PendingIntent.FLAG_UPDATE_CURRENT | immutableFlag());
 
-        return new NotificationCompat.Builder(this, CHANNEL_ID).setSmallIcon(R.mipmap.app_logo).setContentTitle(title).setContentText("Spogify").setLargeIcon(thumbnail).setContentIntent(contentPi).setOngoing(true).setOnlyAlertOnce(true).setPriority(NotificationCompat.PRIORITY_MAX).setCategory(NotificationCompat.CATEGORY_TRANSPORT).setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+        return new NotificationCompat.Builder(this, CHANNEL_ID).setSmallIcon(R.mipmap.app_logo).setContentTitle(title).setContentText(getString(R.string.app_name)).setLargeIcon(thumbnail).setContentIntent(contentPi).setOngoing(true).setOnlyAlertOnce(true).setPriority(NotificationCompat.PRIORITY_MAX).setCategory(NotificationCompat.CATEGORY_TRANSPORT).setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
 
                 .addAction(android.R.drawable.ic_media_previous, "Previous", previousPi)
 
