@@ -1,8 +1,8 @@
 # 🎵 PulseWave
 
 <div align="center">
-  <img src="path/to/your/app_logo.png" alt="PulseWave Logo" width="140" height="140">
-  <p><em>A modern, feature-rich offline and streaming music player for Android built with Java.</em></p>
+  <img src="https://github.com/user-attachments/assets/b340ac4a-697f-4ebb-8513-6941b292af90" alt="PulseWave Logo" width="150" height="150">
+  <p><em>A modern, feature-rich offline/streaming music player for Android built with Java.</em></p>
 </div>
 
 ---
@@ -28,14 +28,15 @@
 ## 📸 App Screenshots
 
 <div align="center">
-  <img src="screenshots/home_screen.jpg" width="30%" alt="Home Screen" />
-  <img src="screenshots/artist_view.jpg" width="30%" alt="Artist Tracklist" />
-  <img src="screenshots/lyrics_view.jpg" width="30%" alt="Lyrics & Menu" />
+  <img width="22%" alt="Home Screen" src="https://github.com/user-attachments/assets/b340ac4a-697f-4ebb-8513-6941b292af90" />
+  <img width="22%" alt="Artist View" src="https://github.com/user-attachments/assets/836e38f8-2e43-4478-91d3-5e3b6bdb4b5b" />
+  <img width="22%" alt="Lyrics View" src="https://github.com/user-attachments/assets/dec3b1e8-be0e-43ff-a93e-96e79c8ca34a" />
+  <img width="22%" alt="Options Menu" src="https://github.com/user-attachments/assets/e0a09e00-92ee-4c91-bd4d-dece9ddb0df7" />
 </div>
 
 ---
 
-## 🛠️ Tech Stack
+## 🛠️ Built With
 
 * **Language:** [Java](https://www.java.com/)
 * **Platform:** Android SDK
@@ -63,9 +64,3 @@ To run or build this project locally from source:
 ## 📄 License
 
 This project is open-source and available under the [MIT License](LICENSE).
-
-<img width="589" height="1280" alt="photo_2026-11-09_11-23-59" src="https://github.com/user-attachments/assets/b340ac4a-697f-4ebb-8513-6941b292af90" />
-<img width="589" height="1280" alt="photo_2026-11-09_11-23-59" src="https://github.com/user-attachments/assets/836e38f8-2e43-4478-91d3-5e3b6bdb4b5b" />
-<img width="589" height="1280" alt="photo_2026-11-09_11-24-03" src="https://github.com/user-attachments/assets/dec3b1e8-be0e-43ff-a93e-96e79c8ca34a" />
-<img width="589" height="1280" alt="photo_2026-11-09_11-24-06" src="https://github.com/user-attachments/assets/e0a09e00-92ee-4c91-bd4d-dece9ddb0df7" />
-
