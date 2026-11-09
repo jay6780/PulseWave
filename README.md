@@ -28,12 +28,12 @@
 ## 📸 App Screenshots
 
 <div align="center">
-  <img width="22%" alt="Home Screen" src="https://github.com/user-attachments/assets/b340ac4a-697f-4ebb-8513-6941b292af90" />
-  <img width="22%" alt="Artist View" src="https://github.com/user-attachments/assets/836e38f8-2e43-4478-91d3-5e3b6bdb4b5b" />
-  <img width="22%" alt="Lyrics View" src="https://github.com/user-attachments/assets/dec3b1e8-be0e-43ff-a93e-96e79c8ca34a" />
-  <img width="22%" alt="Options Menu" src="https://github.com/user-attachments/assets/e0a09e00-92ee-4c91-bd4d-dece9ddb0df7" />
+  <a href="https://github.com/user-attachments/assets/b340ac4a-697f-4ebb-8513-6941b292af90"><img width="48%" alt="Home Screen" src="https://github.com/user-attachments/assets/b340ac4a-697f-4ebb-8513-6941b292af90" /></a>
+  <a href="https://github.com/user-attachments/assets/836e38f8-2e43-4478-91d3-5e3b6bdb4b5b"><img width="48%" alt="Artist View" src="https://github.com/user-attachments/assets/836e38f8-2e43-4478-91d3-5e3b6bdb4b5b" /></a>
+  <br>
+  <a href="https://github.com/user-attachments/assets/dec3b1e8-be0e-43ff-a93e-96e79c8ca34a"><img width="48%" alt="Lyrics View" src="https://github.com/user-attachments/assets/dec3b1e8-be0e-43ff-a93e-96e79c8ca34a" /></a>
+  <a href="https://github.com/user-attachments/assets/e0a09e00-92ee-4c91-bd4d-dece9ddb0df7"><img width="48%" alt="Options Menu" src="https://github.com/user-attachments/assets/e0a09e00-92ee-4c91-bd4d-dece9ddb0df7" /></a>
 </div>
-
 ---
 
 ## 🛠️ Built With
