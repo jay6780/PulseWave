@@ -57,7 +57,3 @@ To run or build this project locally from source:
 3. **Build & Run:**
    * Sync your project with Gradle files.
    * Connect an Android device or start an emulator, then click the **Run ('▶')** button.
-
-## 📄 License
-
-This project is open-source and available under the [MIT License](LICENSE).
