@@ -1,7 +1,6 @@
 # 🎵 PulseWave
 
 <div align="center">
-  <img src="https://github.com/user-attachments/assets/b340ac4a-697f-4ebb-8513-6941b292af90" alt="PulseWave Logo" width="150" height="150">
   <p><em>A modern, feature-rich offline/streaming music player for Android built with Java.</em></p>
 </div>
 
