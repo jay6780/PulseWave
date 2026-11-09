@@ -7,7 +7,7 @@ android {
     compileSdk 35
 
     defaultConfig {
-        applicationId "com.yt.downloader.spofigy"
+        applicationId "com.yt.downloader.pulsewave"
         minSdk 24
         targetSdk 35
         versionCode 17
@@ -23,15 +23,15 @@ android {
 
     signingConfigs {
         release {
-            storeFile file("../spogify.jks")
+            storeFile file("../pulsewave.jks")
             storePassword "123456"
-            keyAlias "spogify"
+            keyAlias "pulsewave"
             keyPassword "123456"
         }
         debug {
-            storeFile file("../spogify.jks")
+            storeFile file("../pulsewave.jks")
             storePassword "123456"
-            keyAlias "spogify"
+            keyAlias "pulsewave"
             keyPassword "123456"
         }
     }
