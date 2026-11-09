@@ -7,7 +7,7 @@ import android.widget.TextView;
 import com.bumptech.glide.Glide;
 import com.bumptech.glide.request.RequestOptions;
 import com.yt.downloader.R;
-import com.yt.downloader.spogify.Utils.Image.DeezerApiArtist;
+import com.yt.downloader.spogify.Utils.Image.DeezerApiTrack;
 import com.yt.downloader.spogify.base.BaseQuickAdapter;
 import com.yt.downloader.spogify.base.BaseViewHolder;
 import com.yt.downloader.spogify.mvp.bean.FavoriteTrack;
@@ -65,7 +65,7 @@ public class FavoriteTrackAdapter extends BaseQuickAdapter<FavoriteTrack, BaseVi
     }
 
     private void fetchDeezerTrackCover(String trackTitle, ImageView imageView) {
-        DeezerApiArtist.fetchArtistImageUrl(trackTitle, new DeezerApiArtist.Callback() {
+        DeezerApiTrack.fetchArtistImageUrl(trackTitle, new DeezerApiTrack.Callback() {
             @Override
             public void onSuccess(String imageUrl) {
                 if (trackTitle.equals(imageView.getTag())) {

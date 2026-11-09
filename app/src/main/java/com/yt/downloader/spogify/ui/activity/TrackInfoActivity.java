@@ -202,6 +202,10 @@ public class TrackInfoActivity extends MiniPlayerActivity implements View.OnClic
             FavoriteTrack fav = favList.get(i);
             TrackInfoBean.Track t = new TrackInfoBean.Track();
             t.setName(fav.getMusicName());
+            if (t.getArtist() == null) {
+                t.setArtist(new TrackInfoBean.Artist());
+            }
+            t.getArtist().setName(fav.getArtistName());
             t.setImageUrl(fav.getImageThumb());
             t.setPlaycount(fav.getTotalListeners());
 
@@ -720,7 +724,7 @@ public class TrackInfoActivity extends MiniPlayerActivity implements View.OnClic
                 public void onSuccess(String filePath) {
                     new Handler(Looper.getMainLooper()).post(() -> {
                         if (currentSheet != null && currentSheet.isAdded()) {
-                            currentSheet.bindTrack(currentDownloadTrack, artistName);
+                            currentSheet.bindTrack(currentDownloadTrack);
                         }
                         Toast.makeText(TrackInfoActivity.this, "Saved to Music/downloaded_music: " + filePath, Toast.LENGTH_LONG).show();
                     });
@@ -881,7 +885,7 @@ public class TrackInfoActivity extends MiniPlayerActivity implements View.OnClic
 
     private void showBottomSheet(TrackInfoBean.Track track) {
         Bottom_settings sheet = Bottom_settings.newInstance();
-        sheet.bindTrack(track, artistName);
+        sheet.bindTrack(track);
         sheet.setActionListener(new Bottom_settings.BottomSheetActionListener() {
             @Override
             public void onFavoriteClicked(TrackInfoBean.Track t) {
@@ -894,7 +898,10 @@ public class TrackInfoActivity extends MiniPlayerActivity implements View.OnClic
                     String imageThumb = !TextUtils.isEmpty(t.getImageUrl()) ? t.getImageUrl() : "";
                     String totalListeners = !TextUtils.isEmpty(t.getListeners())
                             ? t.getListeners() : t.getPlaycount();
-                    favDbHelper.addFavoriteTrack(t.getName(), artistName, imageThumb, totalListeners);
+                    String artistForDb = (t.getArtist() != null
+                            && !TextUtils.isEmpty(t.getArtist().getName()))
+                            ? t.getArtist().getName() : "";
+                    favDbHelper.addFavoriteTrack(t.getName(), artistForDb, imageThumb, totalListeners);
                     Toast.makeText(TrackInfoActivity.this, "Added to Favorites", LENGTH_SHORT).show();
                 }
                 trackInfoAdapter.notifyDataSetChanged();

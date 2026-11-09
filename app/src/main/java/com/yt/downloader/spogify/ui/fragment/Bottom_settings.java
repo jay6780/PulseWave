@@ -28,7 +28,6 @@ public class Bottom_settings extends BottomSheetDialogFragment implements View.O
 
     private FragmentBottomSettingsBinding binding;
     private TrackInfoBean.Track currentTrack;
-    private String artistName = "";
     private BottomSheetActionListener actionListener;
     private FavoriteDatabaseHelper favDbHelper;
     private LyricsDatabaseHelper lyricsDatabaseHelper;
@@ -57,9 +56,8 @@ public class Bottom_settings extends BottomSheetDialogFragment implements View.O
     /**
      * Bind the track to this sheet before showing it.
      */
-    public void bindTrack(TrackInfoBean.Track track, String artistName) {
+    public void bindTrack(TrackInfoBean.Track track) {
         this.currentTrack = track;
-        this.artistName = artistName == null ? "" : artistName;
         if (binding != null) {
             refreshUi();
         }
@@ -90,7 +88,12 @@ public class Bottom_settings extends BottomSheetDialogFragment implements View.O
         if (binding == null || currentTrack == null) return;
 
         binding.tvTitle.setText(currentTrack.getName());
-        binding.tvArtist.setText(TextUtils.isEmpty(artistName) ? "Unknown Artist" : artistName);
+        String artistText = "Unknown Artist";
+        if (currentTrack.getArtist() != null
+                && !TextUtils.isEmpty(currentTrack.getArtist().getName())) {
+            artistText = currentTrack.getArtist().getName();
+        }
+        binding.tvArtist.setText(artistText);
 
         // Thumbnail
         String imageUrl = currentTrack.getImageUrl();
@@ -115,6 +118,11 @@ public class Bottom_settings extends BottomSheetDialogFragment implements View.O
         }
         binding.tvDownload.setText(isDownloaded ? "Downloaded" : "Not downloaded");
         binding.tvFavorites.setText(isFavorite ? "Added to favorites" : "Add to favorites");
+
+
+        binding.llRefreshLyrics.setAlpha(!artistText.equals("Unknown Artist")?  1.0f : 0.5f);
+
+
     }
 
     private void updateAddButtonIcon(ImageView imageView, boolean isFavorite) {
@@ -148,7 +156,16 @@ public class Bottom_settings extends BottomSheetDialogFragment implements View.O
             }
             refreshUi();
         } else if (v.getId() == R.id.ll_refreshLyrics) {
-            showRefreshDialog(currentTrack.getName(),currentTrack.getArtist().getName());
+            if (currentTrack == null) return;
+            String artist = (currentTrack.getArtist() != null
+                    && !TextUtils.isEmpty(currentTrack.getArtist().getName()))
+                    ? currentTrack.getArtist().getName() : "";
+
+            if(TextUtils.isEmpty(artist)){
+                Toast.makeText(getContext(),"Artist name not found can't refresh lyrics",Toast.LENGTH_SHORT).show();
+                return;
+            }
+            showRefreshDialog(currentTrack.getName(), artist);
         } else if (v.getId() == R.id.iv_dismiss) {
             dismissAllowingStateLoss();
         }
