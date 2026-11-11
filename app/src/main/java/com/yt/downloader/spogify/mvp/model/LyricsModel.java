@@ -38,4 +38,31 @@ public class LyricsModel {
                 });
     }
 
+    public static void getRefreshLyrics(String track_name,String artist_name ,final Callback<List<LyricsBean>> callback) {
+        NetworkingUtils.getLyrics()
+                .getRefresh(track_name,artist_name)
+                .observeOn(AndroidSchedulers.mainThread())
+                .subscribeOn(Schedulers.io())
+                .subscribe(new Observer<List<LyricsBean>>() {
+                    @Override
+                    public void onSubscribe(Disposable d) {
+                    }
+
+                    @Override
+                    public void onNext(List<LyricsBean> data) {
+                        callback.returnResult(data);
+                    }
+
+                    @Override
+                    public void onError(Throwable e) {
+                        callback.returnError(e.getMessage());
+                    }
+
+                    @Override
+                    public void onComplete() {
+                    }
+                });
+    }
+
+
 }

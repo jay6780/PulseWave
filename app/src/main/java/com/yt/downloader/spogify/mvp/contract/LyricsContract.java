@@ -10,10 +10,12 @@ public interface LyricsContract {
         void showError(String error);
         void hideLoading();
         void getLyricsSuccess(LyricsBean lyricsBean);
+        void getRefreshLyricsSuccess(List<LyricsBean> lyricsBean);
 
     }
 
     interface Presenter {
         void getLyrics(String track_name,String artist_name,int duration);
+        void getRefreshLyrics(String track_name,String artist_name);
     }
 }

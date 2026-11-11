@@ -76,4 +76,8 @@ public interface YoutubeApi {
             @Query("track_name") String track_name,
             @Query("artist_name") String artist_name,
             @Query("duration") int duration);
+    @GET("api/search")
+    Observable<List<LyricsBean>> getRefresh(
+            @Query("track_name") String track_name,
+            @Query("artist_name") String artist_name);
 }

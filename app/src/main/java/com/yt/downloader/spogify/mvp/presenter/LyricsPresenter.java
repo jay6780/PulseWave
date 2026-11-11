@@ -48,4 +48,32 @@ public class LyricsPresenter implements LyricsContract.Presenter {
             }
         });
     }
+
+    @Override
+    public void getRefreshLyrics(String track_name, String artist_name) {
+        view.showLoading();
+
+        LyricsModel.getRefreshLyrics(track_name,artist_name, new Callback<List<LyricsBean>>() {
+            @Override
+            public void onResponse(@NonNull Call call, @NonNull Response response) throws IOException {
+            }
+
+            @Override
+            public void onFailure(@NonNull Call call, @NonNull IOException e) {
+
+            }
+
+            @Override
+            public void returnResult(List<LyricsBean> apiBean) {
+                view.hideLoading();
+                view.getRefreshLyricsSuccess(apiBean);
+            }
+
+            @Override
+            public void returnError(String message) {
+                view.hideLoading();
+                view.showError(message);
+            }
+        });
+    }
 }

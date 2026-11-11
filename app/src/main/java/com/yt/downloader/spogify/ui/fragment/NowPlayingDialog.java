@@ -9,6 +9,7 @@ import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
 import android.text.TextUtils;
+import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -279,10 +280,54 @@ public class NowPlayingDialog extends DialogFragment implements LyricsContract.V
     @Override
     public void getLyricsSuccess(LyricsBean bean) {
         hideLoading();
-        if (bean == null || TextUtils.isEmpty(bean.getSyncedLyrics())) return;
+        if (bean == null || TextUtils.isEmpty(bean.getSyncedLyrics())) {
+            lastLoadedTrackKey = "";
+            lyricsPresenter.getRefreshLyrics(reqTitle, reqArtist);
+            return;
+        }
+        SavedLyrics(bean.getSyncedLyrics(), bean.getDuration());
+    }
 
-        String syncedLyrics = bean.getSyncedLyrics();
-        double duration = bean.getDuration();
+    @Override
+    public void getRefreshLyricsSuccess(List<LyricsBean> lyricsBean) {
+        hideLoading();
+        if (lyricsBean == null || lyricsBean.isEmpty()) {
+            return;
+        }
+
+        LyricsBean best = null;
+        double bestScore = Double.MAX_VALUE;
+
+        for (LyricsBean b : lyricsBean) {
+            if (b == null) continue;
+            String artistName = b.getArtistName() == null ? "" : b.getArtistName().toLowerCase(Locale.US);
+            String wantArtist = reqArtist == null ? "" : reqArtist.toLowerCase(Locale.US);
+
+            boolean artistMatch = artistName.contains(wantArtist) || wantArtist.contains(artistName);
+            double durDiff = Math.abs(b.getDuration() - PlayerState.get().durationSec);
+
+            double score = durDiff;
+            if (!artistMatch) score += 1000;
+            if (TextUtils.isEmpty(b.getSyncedLyrics())) score += 500;
+
+            if (score < bestScore) {
+                bestScore = score;
+                best = b;
+            }
+        }
+
+        if (best == null) return;
+
+        String lyrics = !TextUtils.isEmpty(best.getSyncedLyrics())
+                ? best.getSyncedLyrics()
+                : best.getPlainLyrics();
+
+        if (TextUtils.isEmpty(lyrics)) return;
+
+        SavedLyrics(lyrics, best.getDuration());
+    }
+
+    private void SavedLyrics(String syncedLyrics,double duration){
         PlayerState s = PlayerState.get();
 
         if (lyricsDatabaseHelper != null) {
@@ -309,14 +354,13 @@ public class NowPlayingDialog extends DialogFragment implements LyricsContract.V
             b.progressBar.setVisibility(View.GONE);
         }
     }
-
     @Override
     public void showError(String error) {
         hideLoading();
-        PlayerState s = PlayerState.get();
-        s.parsedLyrics = Collections.emptyList();
+        PlayerState.get().parsedLyrics = Collections.emptyList();
+        lastLoadedTrackKey = "";
+        lyricsPresenter.getRefreshLyrics(reqTitle, reqArtist);
     }
-
     private void centerOn(int pos) {
         LinearSmoothScroller sc = new LinearSmoothScroller(requireContext()) {
             @Override
