@@ -60,6 +60,8 @@ public class NowPlayingDialog extends DialogFragment implements LyricsContract.V
     private String lastLoadedTrackKey = "";
     private String reqArtist = "";
     private String reqTitle = "";
+    private boolean isRefresh = false;
+
     private MiniPlayerActivity host() {
         return (MiniPlayerActivity) requireActivity();
     }
@@ -235,10 +237,10 @@ public class NowPlayingDialog extends DialogFragment implements LyricsContract.V
             if (cached == null) {
                 clearCurrentLyrics();
                 if (isNetworkAvailable() && lyricsPresenter != null) {
-                    showLoading();
                     int durationInt = (int) s.durationSec;
                     reqArtist = artist;
                     reqTitle = musicTitle;
+                    isRefresh = true;
                     lyricsPresenter.getLyrics(musicTitle, artist, durationInt);
                 } else {
                     hideLoading();
@@ -279,7 +281,6 @@ public class NowPlayingDialog extends DialogFragment implements LyricsContract.V
 
     @Override
     public void getLyricsSuccess(LyricsBean bean) {
-        hideLoading();
         if (bean == null || TextUtils.isEmpty(bean.getSyncedLyrics())) {
             lastLoadedTrackKey = "";
             lyricsPresenter.getRefreshLyrics(reqTitle, reqArtist);
@@ -290,41 +291,21 @@ public class NowPlayingDialog extends DialogFragment implements LyricsContract.V
 
     @Override
     public void getRefreshLyricsSuccess(List<LyricsBean> lyricsBean) {
-        hideLoading();
         if (lyricsBean == null || lyricsBean.isEmpty()) {
             return;
         }
-
-        LyricsBean best = null;
-        double bestScore = Double.MAX_VALUE;
-
-        for (LyricsBean b : lyricsBean) {
-            if (b == null) continue;
-            String artistName = b.getArtistName() == null ? "" : b.getArtistName().toLowerCase(Locale.US);
-            String wantArtist = reqArtist == null ? "" : reqArtist.toLowerCase(Locale.US);
-
-            boolean artistMatch = artistName.contains(wantArtist) || wantArtist.contains(artistName);
-            double durDiff = Math.abs(b.getDuration() - PlayerState.get().durationSec);
-
-            double score = durDiff;
-            if (!artistMatch) score += 1000;
-            if (TextUtils.isEmpty(b.getSyncedLyrics())) score += 500;
-
-            if (score < bestScore) {
-                bestScore = score;
-                best = b;
+        List<String> lyricsList = new ArrayList<>();
+        List<Double> durationList = new ArrayList<>();
+        for (LyricsBean lyrics : lyricsBean) {
+            if (lyrics.getArtistName().equalsIgnoreCase(reqArtist)) {
+                lyricsList.add(lyrics.getSyncedLyrics());
+                durationList.add(lyrics.getDuration());
             }
+            if (lyricsList.isEmpty() && durationList.isEmpty()) {
+                return;
+            }
+            SavedLyrics(lyricsList.get(0), durationList.get(0));
         }
-
-        if (best == null) return;
-
-        String lyrics = !TextUtils.isEmpty(best.getSyncedLyrics())
-                ? best.getSyncedLyrics()
-                : best.getPlainLyrics();
-
-        if (TextUtils.isEmpty(lyrics)) return;
-
-        SavedLyrics(lyrics, best.getDuration());
     }
 
     private void SavedLyrics(String syncedLyrics,double duration){
@@ -342,24 +323,24 @@ public class NowPlayingDialog extends DialogFragment implements LyricsContract.V
 
     @Override
     public void showLoading() {
-        if (b != null && b.progressBar != null) {
-            b.progressBar.setVisibility(View.VISIBLE);
-            b.tvEmpty.setVisibility(View.GONE);
-        }
+        b.progressBar.setVisibility(View.VISIBLE);
+        b.tvEmpty.setVisibility(View.GONE);
     }
 
     @Override
     public void hideLoading() {
-        if (b != null && b.progressBar != null) {
-            b.progressBar.setVisibility(View.GONE);
-        }
+        b.progressBar.setVisibility(View.GONE);
+
     }
     @Override
     public void showError(String error) {
         hideLoading();
         PlayerState.get().parsedLyrics = Collections.emptyList();
-        lastLoadedTrackKey = "";
-        lyricsPresenter.getRefreshLyrics(reqTitle, reqArtist);
+        if(isRefresh){
+            lastLoadedTrackKey = "";
+            isRefresh = false;
+            lyricsPresenter.getRefreshLyrics(reqTitle, reqArtist);
+        }
     }
     private void centerOn(int pos) {
         LinearSmoothScroller sc = new LinearSmoothScroller(requireContext()) {
