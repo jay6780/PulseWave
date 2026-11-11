@@ -60,8 +60,10 @@ public class NowPlayingDialog extends DialogFragment implements LyricsContract.V
     private String lastLoadedTrackKey = "";
     private String reqArtist = "";
     private String reqTitle = "";
-    private boolean isRefresh = false;
 
+    private int lyricsRetryCount = 0;
+    private static final int MAX_LYRICS_RETRIES = 2;
+    private boolean refreshAttempted = false;
     private MiniPlayerActivity host() {
         return (MiniPlayerActivity) requireActivity();
     }
@@ -240,7 +242,6 @@ public class NowPlayingDialog extends DialogFragment implements LyricsContract.V
                     int durationInt = (int) s.durationSec;
                     reqArtist = artist;
                     reqTitle = musicTitle;
-                    isRefresh = true;
                     lyricsPresenter.getLyrics(musicTitle, artist, durationInt);
                 } else {
                     hideLoading();
@@ -282,16 +283,18 @@ public class NowPlayingDialog extends DialogFragment implements LyricsContract.V
     @Override
     public void getLyricsSuccess(LyricsBean bean) {
         if (bean == null || TextUtils.isEmpty(bean.getSyncedLyrics())) {
-            lastLoadedTrackKey = "";
-            lyricsPresenter.getRefreshLyrics(reqTitle, reqArtist);
+            tryRefreshOnce();
             return;
         }
+        lyricsRetryCount = 0;
+        refreshAttempted = false;
         SavedLyrics(bean.getSyncedLyrics(), bean.getDuration());
     }
 
     @Override
     public void getRefreshLyricsSuccess(List<LyricsBean> lyricsBean) {
         if (lyricsBean == null || lyricsBean.isEmpty()) {
+            endLyricsRetry();
             return;
         }
         List<String> lyricsList = new ArrayList<>();
@@ -306,6 +309,7 @@ public class NowPlayingDialog extends DialogFragment implements LyricsContract.V
             }
             SavedLyrics(lyricsList.get(0), durationList.get(0));
         }
+        endLyricsRetry();
     }
 
     private void SavedLyrics(String syncedLyrics,double duration){
@@ -335,12 +339,12 @@ public class NowPlayingDialog extends DialogFragment implements LyricsContract.V
     @Override
     public void showError(String error) {
         hideLoading();
-        PlayerState.get().parsedLyrics = Collections.emptyList();
-        if(isRefresh){
-            lastLoadedTrackKey = "";
-            isRefresh = false;
-            lyricsPresenter.getRefreshLyrics(reqTitle, reqArtist);
+
+        if (lyricsRetryCount >= MAX_LYRICS_RETRIES || refreshAttempted) {
+            endLyricsRetry();
+            return;
         }
+        tryRefreshOnce();
     }
     private void centerOn(int pos) {
         LinearSmoothScroller sc = new LinearSmoothScroller(requireContext()) {
@@ -351,6 +355,27 @@ public class NowPlayingDialog extends DialogFragment implements LyricsContract.V
         };
         sc.setTargetPosition(pos);
         lm.startSmoothScroll(sc);
+    }
+
+    private void tryRefreshOnce() {
+        if (refreshAttempted || lyricsRetryCount >= MAX_LYRICS_RETRIES) {
+            endLyricsRetry();
+            return;
+        }
+        refreshAttempted = true;
+        lyricsRetryCount++;
+        if (lyricsPresenter != null) {
+            lyricsPresenter.getRefreshLyrics(reqTitle, reqArtist);
+        } else {
+            endLyricsRetry();
+        }
+    }
+
+    private void endLyricsRetry() {
+        hideLoading();
+        PlayerState.get().parsedLyrics = Collections.emptyList();
+        lyricsRetryCount = 0;
+        refreshAttempted = false;
     }
 
     private static int findIndex(List<LrcParser.Line> lines, long t) {
