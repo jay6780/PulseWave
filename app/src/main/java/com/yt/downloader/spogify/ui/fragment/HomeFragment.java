@@ -83,7 +83,6 @@ public class HomeFragment extends Fragment implements HomeContract.View {
     }
 
     private void showShimmer() {
-        if (binding == null) return;
         binding.shimmerHome.setVisibility(View.VISIBLE);
         binding.shimmerHome.post(() -> {
             if (binding == null || binding.shimmerHome.getVisibility() != View.VISIBLE) return;
@@ -105,6 +104,7 @@ public class HomeFragment extends Fragment implements HomeContract.View {
                 }
             }
         });
+
     }
 
     private void hideShimmer() {
@@ -270,19 +270,29 @@ public class HomeFragment extends Fragment implements HomeContract.View {
 
     @Override
     public void showError(String error) {
-        once = 0;
-        hideLoading();
+        try {
+            once = 1;
+            hideShimmer();
+            binding.swipeRefresh.setRefreshing(false);
+        }catch (Exception e){
+            e.printStackTrace();
+        }
     }
 
     @Override
     public void hideLoading() {
-        new Handler(Looper.getMainLooper()).postDelayed(() -> {
-            if (binding != null) {
-                once = 0;
-                hideShimmer();
-                binding.swipeRefresh.setRefreshing(false);
-            }
-        }, 500);
+        try {
+            new Handler(Looper.getMainLooper()).postDelayed(() -> {
+                if (binding != null) {
+                    once = 0;
+                    hideShimmer();
+                    binding.swipeRefresh.setRefreshing(false);
+                }
+            }, 500);
+        }catch (Exception e){
+            e.printStackTrace();
+        }
+
     }
 
     @Override
