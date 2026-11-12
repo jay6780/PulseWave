@@ -18,8 +18,8 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
 import androidx.recyclerview.widget.LinearLayoutManager;
-import androidx.swiperefreshlayout.widget.SwipeRefreshLayout;
 
+import com.yt.downloader.R;
 import com.yt.downloader.databinding.FragmentHomeBinding;
 import com.yt.downloader.spogify.Retrofit.AppConstant;
 import com.yt.downloader.spogify.mvp.bean.OpmBean;
@@ -53,6 +53,7 @@ public class HomeFragment extends Fragment implements HomeContract.View {
     private ConnectivityManager connectivityManager;
     private ConnectivityManager.NetworkCallback networkCallback;
     private boolean wasConnected = false;
+    private int once = 1;
 
     @Override
     public View onCreateView(@NonNull LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
@@ -79,6 +80,36 @@ public class HomeFragment extends Fragment implements HomeContract.View {
             binding.swipeRefresh.setEnabled(false);
             binding.tvContent.setText("You're in offline mode");
         }
+    }
+
+    private void showShimmer() {
+        if (binding == null) return;
+        binding.shimmerHome.setVisibility(View.VISIBLE);
+        binding.shimmerHome.post(() -> {
+            if (binding == null || binding.shimmerHome.getVisibility() != View.VISIBLE) return;
+
+            int containerHeight = binding.swipeRefresh.getHeight();
+            if (containerHeight <= 0) {
+                containerHeight = getResources().getDisplayMetrics().heightPixels;
+            }
+
+            int sectionHeightPx = (int) (230 * getResources().getDisplayMetrics().density);
+            int sectionCount = Math.max(1, (int) Math.ceil((double) containerHeight / sectionHeightPx));
+
+            if (binding.llShimmerRows.getChildCount() != sectionCount) {
+                binding.llShimmerRows.removeAllViews();
+                LayoutInflater inflater = LayoutInflater.from(requireContext());
+                for (int i = 0; i < sectionCount; i++) {
+                    View sectionView = inflater.inflate(R.layout.item_shimmer_section, binding.llShimmerRows, false);
+                    binding.llShimmerRows.addView(sectionView);
+                }
+            }
+        });
+    }
+
+    private void hideShimmer() {
+        if (binding == null) return;
+        binding.shimmerHome.setVisibility(View.GONE);
     }
 
     private void registerNetworkCallback() {
@@ -119,6 +150,7 @@ public class HomeFragment extends Fragment implements HomeContract.View {
         wasConnected = false;
         binding.swipeRefresh.setEnabled(false);
         Log.d("NetworkMonitor", "Internet LOST");
+        hideShimmer();
         updateHomeUiConnected(false);
         binding.tvContent.setText("You're in offline mode");
 
@@ -134,6 +166,7 @@ public class HomeFragment extends Fragment implements HomeContract.View {
         binding.llContent.setVisibility(isConnected ? View.VISIBLE : View.GONE);
 
         if (!isConnected) {
+            hideShimmer();
             binding.llTopTracks.setVisibility(View.GONE);
             binding.llTopArtist.setVisibility(View.GONE);
             binding.llOpm.setVisibility(View.GONE);
@@ -142,17 +175,22 @@ public class HomeFragment extends Fragment implements HomeContract.View {
         binding.llEmpty.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                getActivity().startActivity(new Intent(getContext(), TrackInfoActivity.class)
-                        .putExtra("ArtistName", "Downloaded")
-                        .putExtra("SelectedTrackName","")
-                        .putExtra("isFromFavorite", false)
-                        .putExtra("isFromDownload", true));
+                if (getActivity() != null) {
+                    getActivity().startActivity(new Intent(getContext(), TrackInfoActivity.class)
+                            .putExtra("ArtistName", "Downloaded")
+                            .putExtra("SelectedTrackName", "")
+                            .putExtra("isFromFavorite", false)
+                            .putExtra("isFromDownload", true));
+                }
             }
         });
     }
 
     private void initApi() {
         updateHomeUiConnected(true);
+        if(once > 0){
+            showShimmer();
+        }
         homePresenter.getTopTrackQuery(AppConstant.TopTracks, AppConstant.Api_Key, "json");
         homePresenter.getTopArtistQuery(AppConstant.TopArtist, AppConstant.Api_Key, "json");
         homePresenter.getOpmQuery(AppConstant.OPM, "opm", AppConstant.Api_Key, "json");
@@ -162,6 +200,7 @@ public class HomeFragment extends Fragment implements HomeContract.View {
     private void refreshData() {
         try {
             if (!isNetworkAvailable()) {
+                hideShimmer();
                 if (binding.swipeRefresh.isRefreshing()) {
                     binding.swipeRefresh.setEnabled(false);
                     binding.swipeRefresh.setRefreshing(false);
@@ -187,7 +226,6 @@ public class HomeFragment extends Fragment implements HomeContract.View {
             binding.llTopArtist.setVisibility(View.GONE);
             binding.llOpm.setVisibility(View.GONE);
             binding.llRnb.setVisibility(View.GONE);
-            binding.swipeRefresh.setRefreshing(true);
             initApi();
         } catch (Exception e) {
             e.printStackTrace();
@@ -223,19 +261,35 @@ public class HomeFragment extends Fragment implements HomeContract.View {
         binding.rvRnb.setAdapter(rnBAdapter);
     }
 
-    @Override public void showLoading() {
-        if (binding != null) binding.swipeRefresh.setRefreshing(true);
+    @Override
+    public void showLoading() {
+        if (binding != null && binding.shimmerHome.getVisibility() != View.VISIBLE) {
+            binding.swipeRefresh.setRefreshing(true);
+        }
     }
-    @Override public void showError(String error) {
+
+    @Override
+    public void showError(String error) {
+        once = 0;
         hideLoading();
     }
-    @Override public void hideLoading() {
-        new Handler(Looper.getMainLooper()).postDelayed(
-                () -> { if (binding != null) binding.swipeRefresh.setRefreshing(false); }, 500);
+
+    @Override
+    public void hideLoading() {
+        new Handler(Looper.getMainLooper()).postDelayed(() -> {
+            if (binding != null) {
+                once = 0;
+                hideShimmer();
+                binding.swipeRefresh.setRefreshing(false);
+            }
+        }, 500);
     }
 
     @Override
     public void getTopArtistSuccess(TopArtistBean bean) {
+        if (binding == null) return;
+        hideShimmer();
+        binding.swipeRefresh.setRefreshing(false);
         if (bean != null && bean.getArtists() != null && bean.getArtists().getArtist() != null
                 && !bean.getArtists().getArtist().isEmpty()) {
             topArtistList.clear();
@@ -249,6 +303,9 @@ public class HomeFragment extends Fragment implements HomeContract.View {
 
     @Override
     public void getTopTracksSuccess(TopTrackBean topTrackBean) {
+        if (binding == null) return;
+        hideShimmer();
+        binding.swipeRefresh.setRefreshing(false);
         if (topTrackBean != null && topTrackBean.getTracks() != null
                 && topTrackBean.getTracks().getTrack() != null
                 && !topTrackBean.getTracks().getTrack().isEmpty()) {
@@ -263,6 +320,9 @@ public class HomeFragment extends Fragment implements HomeContract.View {
 
     @Override
     public void getOpmSuccess(OpmBean opmBean) {
+        if (binding == null) return;
+        hideShimmer();
+        binding.swipeRefresh.setRefreshing(false);
         if (opmBean != null && opmBean.getTopArtists() != null
                 && opmBean.getTopArtists().getArtist() != null
                 && !opmBean.getTopArtists().getArtist().isEmpty()) {
@@ -277,6 +337,9 @@ public class HomeFragment extends Fragment implements HomeContract.View {
 
     @Override
     public void getRnBSuccess(RAndBbean rAndBbean) {
+        if (binding == null) return;
+        hideShimmer();
+        binding.swipeRefresh.setRefreshing(false);
         if (rAndBbean != null && rAndBbean.getTopArtists() != null
                 && rAndBbean.getTopArtists().getArtist() != null
                 && !rAndBbean.getTopArtists().getArtist().isEmpty()) {
@@ -291,6 +354,7 @@ public class HomeFragment extends Fragment implements HomeContract.View {
 
     @Override
     public void onDestroyView() {
+        hideShimmer();
         if (connectivityManager != null && networkCallback != null) {
             try {
                 connectivityManager.unregisterNetworkCallback(networkCallback);

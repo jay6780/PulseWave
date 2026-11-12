@@ -27,3 +27,4 @@ dependencyResolutionManagement {
 rootProject.name = "Downloader"
 include ':app'
 include ':kprogresshud'
+include ':shimmer_animation'

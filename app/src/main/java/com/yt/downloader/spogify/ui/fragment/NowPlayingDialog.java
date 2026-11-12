@@ -3,17 +3,18 @@ package com.yt.downloader.spogify.ui.fragment;
 import android.content.Context;
 import android.graphics.Color;
 import android.graphics.Typeface;
+import android.graphics.drawable.GradientDrawable;
 import android.net.ConnectivityManager;
 import android.net.NetworkInfo;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
 import android.text.TextUtils;
-import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.Window;
+import android.widget.LinearLayout;
 import android.widget.SeekBar;
 import android.widget.TextView;
 
@@ -61,9 +62,6 @@ public class NowPlayingDialog extends DialogFragment implements LyricsContract.V
     private String reqArtist = "";
     private String reqTitle = "";
 
-    private int lyricsRetryCount = 0;
-    private static final int MAX_LYRICS_RETRIES = 2;
-    private boolean refreshAttempted = false;
     private MiniPlayerActivity host() {
         return (MiniPlayerActivity) requireActivity();
     }
@@ -148,12 +146,57 @@ public class NowPlayingDialog extends DialogFragment implements LyricsContract.V
     @Override
     public void onDestroyView() {
         handler.removeCallbacks(tick);
+        handler.removeCallbacks(hideShimmerRunnable);
         if (lyricsDatabaseHelper != null) {
             lyricsDatabaseHelper.close();
             lyricsDatabaseHelper = null;
         }
         b = null;
         super.onDestroyView();
+    }
+
+    private void populateShimmerLines() {
+        if (b == null || getContext() == null) return;
+        b.shimmerContainer.post(() -> {
+            if (b == null || getContext() == null) return;
+            float density = getResources().getDisplayMetrics().density;
+            int containerHeight = b.shimmerContainer.getHeight();
+            if (containerHeight <= 0) {
+                containerHeight = (int) (getResources().getDisplayMetrics().heightPixels * 0.6f);
+            }
+
+            int rowStepPx = (int) (38 * density); // 20dp bar + 18dp bottom margin
+            int count = Math.max(5, containerHeight / rowStepPx);
+
+            if (b.shimmerContainer.getChildCount() == count) return;
+            b.shimmerContainer.removeAllViews();
+
+            float[] widthFractions = {0.65f, 0.85f, 0.55f, 0.78f, 0.60f};
+            int containerWidth = b.shimmerContainer.getWidth();
+            if (containerWidth <= 0) {
+                containerWidth = getResources().getDisplayMetrics().widthPixels - (int) (40 * density);
+            }
+
+            for (int i = 0; i < count; i++) {
+                View line = new View(getContext());
+                boolean isHighlight = (i % 5 == 2);
+                int barHeight = (int) ((isHighlight ? 24 : 20) * density);
+                int barWidth = (int) (containerWidth * widthFractions[i % widthFractions.length]);
+
+                LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(barWidth, barHeight);
+                if (i < count - 1) {
+                    lp.bottomMargin = (int) (18 * density);
+                }
+                line.setLayoutParams(lp);
+
+                GradientDrawable bg = new GradientDrawable();
+                bg.setColor(isHighlight ? 0x55FFFFFF : 0x33FFFFFF);
+                bg.setCornerRadius(6 * density);
+                line.setBackground(bg);
+
+                b.shimmerContainer.addView(line);
+            }
+        });
     }
 
     private final Runnable tick = new Runnable() {
@@ -183,15 +226,15 @@ public class NowPlayingDialog extends DialogFragment implements LyricsContract.V
             b.ivPlay.setImageResource(s.isPlaying
                     ? android.R.drawable.ic_media_pause : android.R.drawable.ic_media_play);
 
-            // lyrics
             if (s.parsedLyrics != shown) {
                 shown = s.parsedLyrics;
                 adapter.setData(shown);
                 curIdx = -1;
             }
             boolean hasLyrics = shown != null && !shown.isEmpty();
-            boolean isLoading = b.progressBar.getVisibility() == View.VISIBLE;
+            boolean isLoading = b.shimmerAnimationLyrics.getVisibility() == View.VISIBLE;
 
+            b.rvLyrics.setVisibility(isLoading ? View.GONE : View.VISIBLE);
             b.tvEmpty.setVisibility(!isLoading && !hasLyrics ? View.VISIBLE : View.GONE);
 
             if (hasLyrics) {
@@ -240,25 +283,33 @@ public class NowPlayingDialog extends DialogFragment implements LyricsContract.V
                 clearCurrentLyrics();
                 if (isNetworkAvailable() && lyricsPresenter != null) {
                     int durationInt = (int) s.durationSec;
+                    b.rvLyrics.scrollToPosition(0);
                     reqArtist = artist;
                     reqTitle = musicTitle;
                     lyricsPresenter.getLyrics(musicTitle, artist, durationInt);
                 } else {
-                    hideLoading();
+                    handler.removeCallbacks(hideShimmerRunnable);
+                    if (b != null) {
+                        b.shimmerAnimationLyrics.setVisibility(View.GONE);
+                        b.rvLyrics.setVisibility(View.VISIBLE);
+                    }
                 }
                 return;
             }
+            hideLoading();
             s.parsedLyrics = LrcParser.parse(cached.syncedLyrics);
             s.setLyrics(cached.syncedLyrics);
             s.setDuration(cached.duration);
             s.lyricsDurationSec = (float) cached.duration;
         }
     }
+
     private void clearCurrentLyrics() {
         PlayerState state = PlayerState.get();
         state.parsedLyrics = new ArrayList<>();
         state.lyricsDurationSec = 0f;
     }
+
     private String cleanMusicTitle(String title) {
         if (TextUtils.isEmpty(title)) return "";
         String clean = title.trim();
@@ -279,40 +330,35 @@ public class NowPlayingDialog extends DialogFragment implements LyricsContract.V
         return activeNetwork != null && activeNetwork.isConnected();
     }
 
-
     @Override
     public void getLyricsSuccess(LyricsBean bean) {
-        if (bean == null || TextUtils.isEmpty(bean.getSyncedLyrics())) {
-            tryRefreshOnce();
-            return;
+        if (bean == null) return;
+        if (bean.getSyncedLyrics() != null) {
+            String lyrics = bean.getSyncedLyrics();
+            SavedLyrics(lyrics, bean.getDuration());
         }
-        lyricsRetryCount = 0;
-        refreshAttempted = false;
-        SavedLyrics(bean.getSyncedLyrics(), bean.getDuration());
     }
 
     @Override
     public void getRefreshLyricsSuccess(List<LyricsBean> lyricsBean) {
-        if (lyricsBean == null || lyricsBean.isEmpty()) {
-            endLyricsRetry();
-            return;
-        }
+        if (lyricsBean == null || lyricsBean.isEmpty()) return;
         List<String> lyricsList = new ArrayList<>();
         List<Double> durationList = new ArrayList<>();
         for (LyricsBean lyrics : lyricsBean) {
-            if (lyrics.getArtistName().equalsIgnoreCase(reqArtist)) {
-                lyricsList.add(lyrics.getSyncedLyrics());
-                durationList.add(lyrics.getDuration());
+            if (lyrics.getSyncedLyrics() != null) {
+                String lyricsData = lyrics.getSyncedLyrics();
+                if (lyrics.getArtistName() != null && lyrics.getArtistName().equalsIgnoreCase(reqArtist)) {
+                    lyricsList.add(lyricsData);
+                    durationList.add(lyrics.getDuration());
+                }
             }
-            if (lyricsList.isEmpty() && durationList.isEmpty()) {
-                return;
-            }
+        }
+        if (!lyricsList.isEmpty()) {
             SavedLyrics(lyricsList.get(0), durationList.get(0));
         }
-        endLyricsRetry();
     }
 
-    private void SavedLyrics(String syncedLyrics,double duration){
+    private void SavedLyrics(String syncedLyrics, double duration) {
         PlayerState s = PlayerState.get();
 
         if (lyricsDatabaseHelper != null) {
@@ -325,27 +371,96 @@ public class NowPlayingDialog extends DialogFragment implements LyricsContract.V
         s.lyricsDurationSec = (float) duration;
     }
 
+    private static String plainToLrc(String plain, double durationSec) {
+        if (TextUtils.isEmpty(plain)) return "";
+        String[] lines = plain.split("\n");
+
+        int nonEmpty = 0;
+        int totalWeight = 0;
+        for (String l : lines) {
+            String t = l.trim();
+            if (!t.isEmpty()) {
+                nonEmpty++;
+                totalWeight += Math.max(1, t.length());
+            }
+        }
+        if (nonEmpty == 0) return plain;
+
+        double leadIn = 1.0;
+        double tail = 2.0;
+        double usable = durationSec > leadIn + tail
+                ? durationSec - leadIn - tail
+                : (durationSec > 0 ? durationSec : nonEmpty * 2.0);
+
+        double perWeight = usable / totalWeight;
+
+        StringBuilder sb = new StringBuilder();
+        double t = leadIn;
+        for (String l : lines) {
+            String text = l.trim();
+            if (text.isEmpty()) {
+                sb.append('\n');
+                continue;
+            }
+            int totalSec = (int) t;
+            int min = totalSec / 60;
+            double sec = t - min * 60;
+            if (sec >= 60.0) {
+                min++;
+                sec -= 60.0;
+            }
+            if (sec < 0) sec = 0;
+            sb.append(String.format(Locale.US, "[%02d:%05.2f] %s\n", min, sec, text));
+
+            t += perWeight * Math.max(1, text.length());
+        }
+        return sb.toString();
+    }
+
+    private final Runnable hideShimmerRunnable = () -> {
+        try {
+            if (b != null) {
+                b.shimmerAnimationLyrics.setVisibility(View.GONE);
+                b.rvLyrics.setVisibility(View.VISIBLE);
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    };
+
     @Override
     public void showLoading() {
-        b.progressBar.setVisibility(View.VISIBLE);
-        b.tvEmpty.setVisibility(View.GONE);
+        handler.removeCallbacks(hideShimmerRunnable);
+        try {
+            if (b != null) {
+                b.rvLyrics.setVisibility(View.GONE);
+                b.tvEmpty.setVisibility(View.GONE);
+                b.shimmerAnimationLyrics.setVisibility(View.VISIBLE);
+                populateShimmerLines();
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
     }
 
     @Override
     public void hideLoading() {
-        b.progressBar.setVisibility(View.GONE);
-
+        handler.removeCallbacks(hideShimmerRunnable);
+        handler.postDelayed(hideShimmerRunnable, 600);
     }
+
     @Override
     public void showError(String error) {
         hideLoading();
-
-        if (lyricsRetryCount >= MAX_LYRICS_RETRIES || refreshAttempted) {
-            endLyricsRetry();
-            return;
+        if (shown == null || shown.isEmpty()) {
+            if (b != null) b.rvLyrics.scrollToPosition(0);
+            PlayerState.get().parsedLyrics = Collections.emptyList();
+            if (lyricsPresenter != null) {
+                lyricsPresenter.getRefreshLyrics(reqTitle, reqArtist);
+            }
         }
-        tryRefreshOnce();
     }
+
     private void centerOn(int pos) {
         LinearSmoothScroller sc = new LinearSmoothScroller(requireContext()) {
             @Override
@@ -355,27 +470,6 @@ public class NowPlayingDialog extends DialogFragment implements LyricsContract.V
         };
         sc.setTargetPosition(pos);
         lm.startSmoothScroll(sc);
-    }
-
-    private void tryRefreshOnce() {
-        if (refreshAttempted || lyricsRetryCount >= MAX_LYRICS_RETRIES) {
-            endLyricsRetry();
-            return;
-        }
-        refreshAttempted = true;
-        lyricsRetryCount++;
-        if (lyricsPresenter != null) {
-            lyricsPresenter.getRefreshLyrics(reqTitle, reqArtist);
-        } else {
-            endLyricsRetry();
-        }
-    }
-
-    private void endLyricsRetry() {
-        hideLoading();
-        PlayerState.get().parsedLyrics = Collections.emptyList();
-        lyricsRetryCount = 0;
-        refreshAttempted = false;
     }
 
     private static int findIndex(List<LrcParser.Line> lines, long t) {
@@ -402,7 +496,7 @@ public class NowPlayingDialog extends DialogFragment implements LyricsContract.V
         private int cur = -1;
 
         void setData(List<LrcParser.Line> d) {
-            data = d == null ? Collections.<LrcParser.Line>emptyList() : d;
+            data = d == null ? Collections.emptyList() : d;
             cur = -1;
             notifyDataSetChanged();
         }
