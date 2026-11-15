@@ -44,7 +44,7 @@ public class PlaybackService extends Service {
     private static final String CHANNEL_ID = "yt_playback";
     private static final int NOTIF_ID = 101;
 
-    private String title = "Spogify";
+    private String title = "PulseWave";
     private String videoId = "";
     private volatile Bitmap thumbnail;
     private String musicPic = "";
