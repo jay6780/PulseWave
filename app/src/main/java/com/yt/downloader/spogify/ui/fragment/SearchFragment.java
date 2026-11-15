@@ -159,13 +159,6 @@ public class SearchFragment extends Fragment implements View.OnClickListener, Mu
         });
     }
 
-    @Override
-    public void onResume() {
-        super.onResume();
-        if (musicListAdapter != null) {
-            musicListAdapter.notifyDataSetChanged();
-        }
-    }
 
     @Override
     public void onClick(View v) {

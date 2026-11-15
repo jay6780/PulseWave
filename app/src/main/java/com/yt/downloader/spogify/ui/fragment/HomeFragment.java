@@ -53,7 +53,6 @@ public class HomeFragment extends Fragment implements HomeContract.View {
     private ConnectivityManager connectivityManager;
     private ConnectivityManager.NetworkCallback networkCallback;
     private boolean wasConnected = false;
-    private int once = 1;
 
     @Override
     public View onCreateView(@NonNull LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
@@ -188,9 +187,6 @@ public class HomeFragment extends Fragment implements HomeContract.View {
 
     private void initApi() {
         updateHomeUiConnected(true);
-        if(once > 0){
-            showShimmer();
-        }
         homePresenter.getTopTrackQuery(AppConstant.TopTracks, AppConstant.Api_Key, "json");
         homePresenter.getTopArtistQuery(AppConstant.TopArtist, AppConstant.Api_Key, "json");
         homePresenter.getOpmQuery(AppConstant.OPM, "opm", AppConstant.Api_Key, "json");
@@ -263,15 +259,14 @@ public class HomeFragment extends Fragment implements HomeContract.View {
 
     @Override
     public void showLoading() {
-        if (binding != null && binding.shimmerHome.getVisibility() != View.VISIBLE) {
-            binding.swipeRefresh.setRefreshing(true);
-        }
+        showShimmer();
+        binding.swipeRefresh.setRefreshing(true);
+
     }
 
     @Override
     public void showError(String error) {
         try {
-            once = 1;
             hideShimmer();
             binding.swipeRefresh.setRefreshing(false);
         }catch (Exception e){
@@ -282,13 +277,8 @@ public class HomeFragment extends Fragment implements HomeContract.View {
     @Override
     public void hideLoading() {
         try {
-            new Handler(Looper.getMainLooper()).postDelayed(() -> {
-                if (binding != null) {
-                    once = 0;
-                    hideShimmer();
-                    binding.swipeRefresh.setRefreshing(false);
-                }
-            }, 500);
+            hideShimmer();
+            binding.swipeRefresh.setRefreshing(false);
         }catch (Exception e){
             e.printStackTrace();
         }
@@ -298,7 +288,6 @@ public class HomeFragment extends Fragment implements HomeContract.View {
     @Override
     public void getTopArtistSuccess(TopArtistBean bean) {
         if (binding == null) return;
-        hideShimmer();
         binding.swipeRefresh.setRefreshing(false);
         if (bean != null && bean.getArtists() != null && bean.getArtists().getArtist() != null
                 && !bean.getArtists().getArtist().isEmpty()) {
@@ -314,7 +303,6 @@ public class HomeFragment extends Fragment implements HomeContract.View {
     @Override
     public void getTopTracksSuccess(TopTrackBean topTrackBean) {
         if (binding == null) return;
-        hideShimmer();
         binding.swipeRefresh.setRefreshing(false);
         if (topTrackBean != null && topTrackBean.getTracks() != null
                 && topTrackBean.getTracks().getTrack() != null
@@ -331,7 +319,6 @@ public class HomeFragment extends Fragment implements HomeContract.View {
     @Override
     public void getOpmSuccess(OpmBean opmBean) {
         if (binding == null) return;
-        hideShimmer();
         binding.swipeRefresh.setRefreshing(false);
         if (opmBean != null && opmBean.getTopArtists() != null
                 && opmBean.getTopArtists().getArtist() != null
@@ -348,7 +335,6 @@ public class HomeFragment extends Fragment implements HomeContract.View {
     @Override
     public void getRnBSuccess(RAndBbean rAndBbean) {
         if (binding == null) return;
-        hideShimmer();
         binding.swipeRefresh.setRefreshing(false);
         if (rAndBbean != null && rAndBbean.getTopArtists() != null
                 && rAndBbean.getTopArtists().getArtist() != null
@@ -364,7 +350,6 @@ public class HomeFragment extends Fragment implements HomeContract.View {
 
     @Override
     public void onDestroyView() {
-        hideShimmer();
         if (connectivityManager != null && networkCallback != null) {
             try {
                 connectivityManager.unregisterNetworkCallback(networkCallback);
