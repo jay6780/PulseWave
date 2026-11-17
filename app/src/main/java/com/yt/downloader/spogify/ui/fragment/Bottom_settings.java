@@ -73,10 +73,21 @@ public class Bottom_settings extends BottomSheetDialogFragment implements View.O
     }
 
     public void setDownloading(boolean downloading, int progress) {
+        if (this.isDownloading == downloading && this.downloadProgress == progress) {
+            return;
+        }
         this.isDownloading = downloading;
         this.downloadProgress = progress;
         if (binding != null) {
-            refreshUi();
+            if (downloading) {
+                binding.ivDownload.setImageResource(android.R.drawable.stat_sys_download);
+                binding.ivDownload.setColorFilter(Color.parseColor("#B3B3B3"));
+                binding.tvDownload.setText(progress > 0
+                        ? "Downloading... " + progress + "%"
+                        : "Preparing download...");
+            } else {
+                refreshUi();
+            }
         }
     }
 

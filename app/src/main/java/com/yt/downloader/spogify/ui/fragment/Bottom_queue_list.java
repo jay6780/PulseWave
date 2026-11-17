@@ -42,6 +42,8 @@ import java.io.File;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 public class Bottom_queue_list extends BottomSheetDialogFragment {
 
@@ -53,6 +55,8 @@ public class Bottom_queue_list extends BottomSheetDialogFragment {
     private ConnectivityManager connectivityManager;
     private ConnectivityManager.NetworkCallback networkCallback;
     private boolean wasConnected = true;
+    private String lastNowThumb = null;
+    private final ExecutorService bgExecutor = Executors.newSingleThreadExecutor();
     private final Handler syncHandler = new Handler(Looper.getMainLooper());
     private boolean lastSyncedPlaying = false;
     private String lastSyncedTitle = "";
@@ -96,16 +100,23 @@ public class Bottom_queue_list extends BottomSheetDialogFragment {
         if (wasConnected) {
             PlayerState state = PlayerState.get();
             if (state.queue.isEmpty()) {
-                List<PlayerState.Item> saved = queueDbHelper.getAllQueueTracks();
-                if (!saved.isEmpty()) {
-                    state.queue.addAll(saved);
-                    state.queueIndex = 0;
-                }
+                bgExecutor.execute(() -> {
+                    List<PlayerState.Item> saved = queueDbHelper.getAllQueueTracks();
+                    new Handler(Looper.getMainLooper()).post(() -> {
+                        if (binding == null) return;
+                        if (PlayerState.get().queue.isEmpty() && !saved.isEmpty()) {
+                            PlayerState.get().queue.addAll(saved);
+                            PlayerState.get().queueIndex = 0;
+                            refreshUi();
+                        }
+                    });
+                });
             } else {
-                queueDbHelper.replaceQueue(state.queue);
+                List<PlayerState.Item> snapshot = new ArrayList<>(state.queue);
+                bgExecutor.execute(() -> queueDbHelper.replaceQueue(snapshot));
             }
         } else {
-            applyQueueByNetworkState(false);
+            applyQueueByNetworkState(false, false);
         }
         registerNetworkCallback();
 
@@ -256,22 +267,27 @@ public class Bottom_queue_list extends BottomSheetDialogFragment {
             binding.tvNowTitle.setText(nowTitle);
             binding.tvNowArtist.setText(!TextUtils.isEmpty(nowArtist) ? nowArtist : "Unknown Artist");
 
-            if (!TextUtils.isEmpty(nowThumb)) {
-                Glide.with(this)
-                        .load(nowThumb)
-                        .apply(new RequestOptions()
-                                .transform(new CenterCrop(), new RoundedCorners(10))
-                                .placeholder(R.mipmap.app_logo)
-                                .error(R.mipmap.app_logo))
-                        .into(binding.ivNowThumb);
-            } else {
-                binding.ivNowThumb.setImageResource(R.mipmap.app_logo);
+            String thumbKey = nowThumb == null ? "" : nowThumb;
+            if (!TextUtils.equals(lastNowThumb, thumbKey)) {
+                lastNowThumb = thumbKey;
+                if (!TextUtils.isEmpty(nowThumb)) {
+                    Glide.with(this)
+                            .load(nowThumb)
+                            .apply(new RequestOptions()
+                                    .transform(new CenterCrop(), new RoundedCorners(10))
+                                    .placeholder(R.mipmap.app_logo)
+                                    .error(R.mipmap.app_logo))
+                            .into(binding.ivNowThumb);
+                } else {
+                    binding.ivNowThumb.setImageResource(R.mipmap.app_logo);
+                }
             }
 
             binding.ivNowPlayPause.setImageResource(state.isPlaying
                     ? android.R.drawable.ic_media_pause
                     : android.R.drawable.ic_media_play);
         } else {
+            lastNowThumb = null;
             binding.llNowPlaying.setVisibility(View.GONE);
         }
 
@@ -302,11 +318,7 @@ public class Bottom_queue_list extends BottomSheetDialogFragment {
                 new Handler(Looper.getMainLooper()).post(() -> {
                     if (wasConnected || binding == null) return;
                     wasConnected = true;
-                    applyQueueByNetworkState(true);
-                    if (!PlayerState.get().queue.isEmpty() && getActivity() instanceof MiniPlayerActivity) {
-                        ((MiniPlayerActivity) getActivity()).playSharedQueueAt(0);
-                    }
-                    refreshUi();
+                    applyQueueByNetworkState(true, true);
                 });
             }
 
@@ -315,11 +327,7 @@ public class Bottom_queue_list extends BottomSheetDialogFragment {
                 new Handler(Looper.getMainLooper()).post(() -> {
                     if (!wasConnected || binding == null) return;
                     wasConnected = false;
-                    applyQueueByNetworkState(false);
-                    if (!PlayerState.get().queue.isEmpty() && getActivity() instanceof MiniPlayerActivity) {
-                        ((MiniPlayerActivity) getActivity()).playSharedQueueAt(0);
-                    }
-                    refreshUi();
+                    applyQueueByNetworkState(false, true);
                 });
             }
         };
@@ -336,28 +344,12 @@ public class Bottom_queue_list extends BottomSheetDialogFragment {
         return activeNetworkInfo != null && activeNetworkInfo.isConnected();
     }
 
-    private void applyQueueByNetworkState(boolean isConnected) {
-        PlayerState state = PlayerState.get();
-        List<PlayerState.Item> saved = queueDbHelper.getAllQueueTracks();
-
-        if (isConnected) {
-            state.queue.clear();
-            state.queue.addAll(saved);
-            if (!TextUtils.isEmpty(state.title)) {
-                int matchedIdx = -1;
-                for (int i = 0; i < state.queue.size(); i++) {
-                    if (state.title.equalsIgnoreCase(state.queue.get(i).name)) {
-                        matchedIdx = i;
-                        break;
-                    }
-                }
-                state.queueIndex = matchedIdx >= 0 ? matchedIdx : (state.queue.isEmpty() ? -1 : 0);
-            } else {
-                state.queueIndex = state.queue.isEmpty() ? -1 : 0;
-            }
-        } else {
-            List<PlayerState.Item> downloadedOnly = new ArrayList<>();
-            if (filesExtractor != null) {
+    private void applyQueueByNetworkState(boolean isConnected, boolean autoPlayFirst) {
+        bgExecutor.execute(() -> {
+            List<PlayerState.Item> nextList = new ArrayList<>();
+            if (isConnected) {
+                nextList.addAll(queueDbHelper.getAllQueueTracks());
+            } else if (filesExtractor != null) {
                 ArrayList<VideoFile> downloadedFiles = filesExtractor.listVideos();
                 for (VideoFile vf : downloadedFiles) {
                     if (vf == null || TextUtils.isEmpty(vf.getName())) continue;
@@ -365,7 +357,7 @@ public class Bottom_queue_list extends BottomSheetDialogFragment {
                     String cleanName = rawName.toLowerCase().endsWith(".mp3")
                             ? rawName.substring(0, rawName.length() - 4)
                             : rawName;
-                    downloadedOnly.add(new PlayerState.Item(
+                    nextList.add(new PlayerState.Item(
                             cleanName,
                             "Downloaded Track",
                             "",
@@ -374,10 +366,32 @@ public class Bottom_queue_list extends BottomSheetDialogFragment {
                     ));
                 }
             }
-            state.queue.clear();
-            state.queue.addAll(downloadedOnly);
-            state.queueIndex = state.queue.isEmpty() ? -1 : 0;
-        }
+
+            new Handler(Looper.getMainLooper()).post(() -> {
+                if (binding == null) return;
+                PlayerState state = PlayerState.get();
+                state.queue.clear();
+                state.queue.addAll(nextList);
+
+                if (isConnected && !TextUtils.isEmpty(state.title)) {
+                    int matchedIdx = -1;
+                    for (int i = 0; i < state.queue.size(); i++) {
+                        if (state.title.equalsIgnoreCase(state.queue.get(i).name)) {
+                            matchedIdx = i;
+                            break;
+                        }
+                    }
+                    state.queueIndex = matchedIdx >= 0 ? matchedIdx : (state.queue.isEmpty() ? -1 : 0);
+                } else {
+                    state.queueIndex = state.queue.isEmpty() ? -1 : 0;
+                }
+
+                if (autoPlayFirst && !state.queue.isEmpty() && getActivity() instanceof MiniPlayerActivity) {
+                    ((MiniPlayerActivity) getActivity()).playSharedQueueAt(0);
+                }
+                refreshUi();
+            });
+        });
     }
 
     private void updateShuffleUi() {
@@ -500,5 +514,6 @@ public class Bottom_queue_list extends BottomSheetDialogFragment {
         }
         super.onDestroyView();
         binding = null;
+        lastNowThumb = null;
     }
 }

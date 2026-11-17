@@ -67,12 +67,16 @@ public class DownloadTrackModel {
                             byte[] data = new byte[4096];
                             long total = 0;
                             int count;
+                            int lastProgress = -1;
 
                             while ((count = input.read(data)) != -1) {
                                 total += count;
                                 if (fileLength > 0) {
                                     int progress = (int) (total * 100 / fileLength);
-                                    callback.onProgress(progress);
+                                    if (progress != lastProgress) {
+                                        lastProgress = progress;
+                                        callback.onProgress(progress);
+                                    }
                                 }
                                 output.write(data, 0, count);
                             }
@@ -102,12 +106,16 @@ public class DownloadTrackModel {
                     byte[] data = new byte[4096];
                     long total = 0;
                     int count;
+                    int lastProgress = -1;
 
                     while ((count = input.read(data)) != -1) {
                         total += count;
                         if (fileLength > 0) {
                             int progress = (int) (total * 100 / fileLength);
-                            callback.onProgress(progress);
+                            if (progress != lastProgress) {
+                                lastProgress = progress;
+                                callback.onProgress(progress);
+                            }
                         }
                         output.write(data, 0, count);
                     }
