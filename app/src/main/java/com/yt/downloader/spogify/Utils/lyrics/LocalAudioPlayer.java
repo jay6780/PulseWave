@@ -81,6 +81,10 @@ public class LocalAudioPlayer {
         }
     }
 
+    public boolean hasLoadedMedia() {
+        return mediaPlayer != null;
+    }
+
     public void togglePlayPause() {
         if (mediaPlayer == null) return;
 

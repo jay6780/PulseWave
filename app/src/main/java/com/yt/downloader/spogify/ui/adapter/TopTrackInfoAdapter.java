@@ -48,9 +48,6 @@ public class TopTrackInfoAdapter extends BaseQuickAdapter<TrackInfoBean.Track, B
         void onTrackClick(TrackInfoBean.Track track, int position, boolean isDownloaded);
     }
 
-    public interface OnFavoriteRemovedListener {
-        void onFavoriteRemoved();
-    }
 
     public interface OnMoreClickListener {
         void onMoreClick(TrackInfoBean.Track track, int position);

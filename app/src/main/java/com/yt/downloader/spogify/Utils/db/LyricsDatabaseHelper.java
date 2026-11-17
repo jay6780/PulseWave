@@ -109,6 +109,34 @@ public class LyricsDatabaseHelper extends SQLiteOpenHelper {
             }
         }
 
+        String normArtist = normalize(artistName);
+        String normMusic = normalize(musicName);
+        if (!TextUtils.isEmpty(normArtist)) {
+            try (Cursor cursor = db.query(
+                    TABLE_LYRICS,
+                    new String[]{COL_ARTIST, COL_LYRICS, COL_DURATION},
+                    COL_MUSIC + " = ?",
+                    new String[]{normMusic},
+                    null,
+                    null,
+                    null
+            )) {
+                if (cursor != null && cursor.moveToFirst()) {
+                    do {
+                        String dbArtist = normalize(cursor.getString(0));
+                        if (!TextUtils.isEmpty(dbArtist)
+                                && (dbArtist.contains(normArtist) || normArtist.contains(dbArtist))) {
+                            String lyrics = cursor.getString(1);
+                            double duration = cursor.getDouble(2);
+                            if (!TextUtils.isEmpty(lyrics)) {
+                                return new CachedLyrics(lyrics, duration);
+                            }
+                        }
+                    } while (cursor.moveToNext());
+                }
+            }
+        }
+
         return null;
     }
 
@@ -128,6 +156,14 @@ public class LyricsDatabaseHelper extends SQLiteOpenHelper {
                         normalize(musicName)
                 }
         );
+
+        if (result == 0 && !TextUtils.isEmpty(musicName)) {
+            result = db.delete(
+                    TABLE_LYRICS,
+                    COL_MUSIC + " = ?",
+                    new String[]{normalize(musicName)}
+            );
+        }
 
         return result > 0;
     }

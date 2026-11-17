@@ -191,6 +191,7 @@ public abstract class MiniPlayerActivity extends AppCompatActivity {
                 playSharedQueueAt(s.queueIndex + 1);
         }
     }
+
     /**
      * Called whenever play/pause state changes so the subclass can update its UI.
      */
@@ -203,8 +204,10 @@ public abstract class MiniPlayerActivity extends AppCompatActivity {
     public String getTargetActivityName() {
         return getClass().getName();
     }
+
     public void onTrackChanged() {
     }
+
     private boolean isAlive(MiniPlayerActivity a) {
         return a != null && !a.isDestroyed();
     }
@@ -309,7 +312,8 @@ public abstract class MiniPlayerActivity extends AppCompatActivity {
         lastActive = new WeakReference<>(this);
 
         if (mini != null) {
-            if (PlayerState.get().hasTrack && PlayerState.get().isLocal) {
+            if (PlayerState.get().hasTrack && PlayerState.get().isLocal
+                    && LocalAudioPlayer.getInstance().hasLoadedMedia()) {
                 playbackOwner = new WeakReference<>(this);
                 isLocalPlayback = true;
                 isPlaying = PlayerState.get().isPlaying;
@@ -325,28 +329,30 @@ public abstract class MiniPlayerActivity extends AppCompatActivity {
 
     @Override
     protected void onDestroy() {
-        boolean wasOwner = playbackOwner.get() == this;
-
-        miniProgressHandler.removeCallbacks(miniProgressRunnable);
-
-        if (receiverRegistered) {
-            unregisterReceiver(controlReceiver);
-            receiverRegistered = false;
-        }
-
-        if (miniYouTubePlayerView != null) {
-            miniYouTubePlayerView.release();
-        }
-
-        if (wasOwner) {
-            playbackOwner.clear();
-        }
-
-        if (lastActive.get() == this) {
-            lastActive.clear();
-        }
-
         super.onDestroy();
+        PlayerState s = PlayerState.get();
+        if (s != null && s.queue.isEmpty()) {
+            boolean wasOwner = playbackOwner.get() == this;
+
+            miniProgressHandler.removeCallbacks(miniProgressRunnable);
+
+            if (receiverRegistered) {
+                unregisterReceiver(controlReceiver);
+                receiverRegistered = false;
+            }
+
+            if (miniYouTubePlayerView != null) {
+                miniYouTubePlayerView.release();
+            }
+
+            if (wasOwner) {
+                playbackOwner.clear();
+            }
+
+            if (lastActive.get() == this) {
+                lastActive.clear();
+            }
+        }
     }
 
     // ---------------------------------------------------------------
@@ -386,6 +392,10 @@ public abstract class MiniPlayerActivity extends AppCompatActivity {
         mini.ivMiniPlayPause.setOnClickListener(v -> togglePlayPause());
 
         mini.ivMiniNext.setOnClickListener(v -> advanceToNextTrack());
+
+        mini.ivMiniQueue.setOnClickListener(v ->
+                com.yt.downloader.spogify.ui.fragment.Bottom_queue_list.newInstance()
+                        .show(getSupportFragmentManager(), "bottom_queue_list"));
 
         miniYouTubePlayerView.initialize(new AbstractYouTubePlayerListener() {
             @Override
@@ -772,6 +782,8 @@ public abstract class MiniPlayerActivity extends AppCompatActivity {
             File f = new File(s.localPath);
             if (!f.exists()) return false;
             playLocal(f, s.title, s.artist);
+        } else if (TextUtils.isEmpty(s.videoId) && s.queueIndex >= 0 && s.queueIndex < s.queue.size()) {
+            playSharedQueueAt(s.queueIndex);
         } else {
             playOnline(s.videoId, s.title, s.artist, s.thumb, s.positionSec);
         }
@@ -883,11 +895,18 @@ public abstract class MiniPlayerActivity extends AppCompatActivity {
 
     public void togglePlayPause() {
         MiniPlayerActivity t = target();
-        if (t != this) { t.togglePlayPause(); return; }
+        if (t != this) {
+            t.togglePlayPause();
+            return;
+        }
 
         if (!isLoadedHere() && resumeFromState()) return;
 
         if (isLocalPlayback) {
+            if (!LocalAudioPlayer.getInstance().hasLoadedMedia()) {
+                resumeFromState();
+                return;
+            }
             LocalAudioPlayer.getInstance().togglePlayPause();
         } else if (miniPlayer != null) {
             if (isPlaying) miniPlayer.pause();
@@ -897,7 +916,10 @@ public abstract class MiniPlayerActivity extends AppCompatActivity {
 
     public void seekToSec(float sec) {
         MiniPlayerActivity t = target();
-        if (t != this) { t.seekToSec(sec); return; }
+        if (t != this) {
+            t.seekToSec(sec);
+            return;
+        }
 
         if (isLocalPlayback) {
             LocalAudioPlayer.getInstance().seekTo((long) (sec * 1000));

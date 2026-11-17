@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:gravity="center_vertical"
+    android:orientation="horizontal"
+    android:paddingStart="16dp"
+    android:paddingTop="8dp"
+    android:paddingEnd="12dp"
+    android:paddingBottom="8dp">
+
+    <CheckBox
+        android:id="@+id/cb_select"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginEnd="6dp"
+        android:buttonTint="#1DB954"
+        android:visibility="gone" />
+
+    <ImageView
+        android:id="@+id/iv_queue_thumb"
+        android:layout_width="48dp"
+        android:layout_height="48dp"
+        android:scaleType="centerCrop" />
+
+    <LinearLayout
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="12dp"
+        android:layout_marginEnd="8dp"
+        android:layout_weight="1"
+        android:orientation="vertical">
+
+        <TextView
+            android:id="@+id/tv_queue_title"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:ellipsize="end"
+            android:maxLines="1"
+            android:textColor="#FFFFFF"
+            android:textSize="15sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/tv_queue_artist"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="2dp"
+            android:ellipsize="end"
+            android:maxLines="1"
+            android:textColor="#B3B3B3"
+            android:textSize="13sp" />
+    </LinearLayout>
+
+    <com.yt.downloader.spogify.Utils.lyrics.EqualizerView
+        android:id="@+id/equalizer_view"
+        android:layout_width="18dp"
+        android:layout_height="18dp"
+        android:layout_marginEnd="8dp"
+        android:visibility="gone" />
+
+    <ImageView
+        android:id="@+id/iv_drag_handle"
+        android:layout_width="36dp"
+        android:layout_height="36dp"
+        android:padding="6dp"
+        android:src="@drawable/ic_drag_handle"
+        app:tint="#B3B3B3" />
+
+</LinearLayout>

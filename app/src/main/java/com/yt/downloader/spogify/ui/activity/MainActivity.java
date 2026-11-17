@@ -1,11 +1,13 @@
 package com.yt.downloader.spogify.ui.activity;
 
 import android.Manifest;
+import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.graphics.Color;
 import android.os.Build;
 import android.os.Bundle;
 import android.text.TextUtils;
+import android.util.Log;
 import android.view.View;
 import android.widget.Toast;
 
@@ -26,15 +28,15 @@ import com.yt.downloader.spogify.ui.fragment.PlayListFragment;
 import com.yt.downloader.spogify.ui.fragment.SearchFragment;
 
 import java.util.ArrayList;
+import java.util.List;
 
 import com.yt.downloader.spogify.Utils.db.LyricsDatabaseHelper;
+import com.yt.downloader.spogify.Utils.db.QueueDatabaseHelper;
 
 public class MainActivity extends MiniPlayerActivity implements View.OnClickListener {
 
     private ActivityMainBinding binding;
-    private LyricsDatabaseHelper lyricsDatabaseHelper;
     private Fragment homeFragment, searchFragment, playlistFragment;
-    private String currentLyricsTrackKey = "";
     public static final int TAB_HOME = 1, TAB_SEARCH = 2, TAB_PLAYLIST = 3;
 
     @Override
@@ -43,12 +45,36 @@ public class MainActivity extends MiniPlayerActivity implements View.OnClickList
         binding = ActivityMainBinding.inflate(getLayoutInflater());
         setContentView(binding.getRoot());
         bindMiniPlayer(binding.layoutMiniPlayer);
-        lyricsDatabaseHelper = new LyricsDatabaseHelper(this);
+        loadSavedQueueIntoMiniPlayer();
         askNotificationPermission();
         binding.llHome.setOnClickListener(this);
         binding.llPlaylist.setOnClickListener(this);
         binding.llSearch.setOnClickListener(this);
         initFragments(savedInstanceState);
+    }
+
+    private void loadSavedQueueIntoMiniPlayer() {
+        QueueDatabaseHelper queueDbHelper = new QueueDatabaseHelper(this);
+        PlayerState state = PlayerState.get();
+        if (state.queue.isEmpty()) {
+            List<PlayerState.Item> savedQueue = queueDbHelper.getAllQueueTracks();
+            if (!savedQueue.isEmpty()) {
+                state.queue.addAll(savedQueue);
+            }
+        }
+        if (!state.hasTrack && !state.queue.isEmpty()) {
+            PlayerState.Item first = state.queue.get(0);
+            state.queueIndex = 0;
+            state.hasTrack = true;
+            state.isPlaying = false;
+            state.title = first.name;
+            state.artist = first.artist;
+            state.thumb = first.thumb;
+            state.videoId = first.videoId;
+            state.localPath = first.localPath;
+            state.isLocal = !TextUtils.isEmpty(first.localPath) && new java.io.File(first.localPath).exists();
+            restoreFromState();
+        }
     }
 
     private void askNotificationPermission() {
@@ -176,65 +202,25 @@ public class MainActivity extends MiniPlayerActivity implements View.OnClickList
         }
     }
 
-    private void clearCurrentLyrics() {
-        currentLyricsTrackKey = "";
-        PlayerState state = PlayerState.get();
-        state.parsedLyrics = new ArrayList<>();
-        state.lyricsDurationSec = 0f;
-    }
+
 
     @Override
     protected void onResume() {
         super.onResume();
-        checkAndLoadSavedLyrics();
         onTrackChanged();
-    }
-    private void checkAndLoadSavedLyrics() {
-        PlayerState state = PlayerState.get();
-        if (!state.hasTrack || TextUtils.isEmpty(state.title)) {
-            clearCurrentLyrics();
-            return;
+        PlayerState s = PlayerState.get();
+        List<String> name = new ArrayList<>();
+        for (PlayerState.Item item : s.queue) {
+            name.add(item.getName());
         }
-        String trackKey = state.isLocal ? "local:" + state.localPath : "online:" + state.videoId;
-        if (TextUtils.equals(currentLyricsTrackKey, trackKey)) {
-            return;
-        }
-        currentLyricsTrackKey = trackKey;
-        if (lyricsDatabaseHelper != null) {
-            String title = state.title;
-            String artist = state.artist == null ? "" : state.artist;
-            if (state.queue != null && state.queueIndex >= 0 && state.queueIndex < state.queue.size()) {
-                PlayerState.Item item = state.queue.get(state.queueIndex);
-                if (item != null) {
-                    if (!TextUtils.isEmpty(item.name)) title = item.name;
-                    if (!TextUtils.isEmpty(item.artist)) artist = item.artist;
-                }
-            }
-            LyricsDatabaseHelper.CachedLyrics cached = lyricsDatabaseHelper.getLyrics(artist, title);
-            if (cached == null) {
-                cached = lyricsDatabaseHelper.getLyricsByMusicName(title);
-            }
-
-            if (cached != null && !TextUtils.isEmpty(cached.syncedLyrics)) {
-                state.parsedLyrics = LrcParser.parse(cached.syncedLyrics);
-                state.setLyrics(cached.syncedLyrics);
-                state.setDuration(cached.duration);
-                state.lyricsDurationSec = (float) cached.duration;
-                super.onTrackChanged();
-            }else{
-                clearCurrentLyrics();
-            }
-
-        }
-
+        Log.d("Quelist", "val: " + name);
     }
 
     @Override
-    protected void onDestroy() {
-        if (lyricsDatabaseHelper != null) {
-            lyricsDatabaseHelper.close();
-            lyricsDatabaseHelper = null;
+    protected void onActivityResult(int requestCode, int resultCode, @Nullable Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+        if (searchFragment != null && searchFragment.isAdded()) {
+            searchFragment.onActivityResult(requestCode, resultCode, data);
         }
-        super.onDestroy();
     }
 }

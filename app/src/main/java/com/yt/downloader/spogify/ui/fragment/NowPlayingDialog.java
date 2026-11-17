@@ -86,6 +86,7 @@ public class NowPlayingDialog extends DialogFragment implements LyricsContract.V
         b.rvLyrics.setAdapter(adapter);
 
         b.ivCollapse.setOnClickListener(v -> dismiss());
+        b.ivQueue.setOnClickListener(v -> Bottom_queue_list.newInstance().show(getParentFragmentManager(), "bottom_queue_list"));
         b.ivPlay.setOnClickListener(v -> host().togglePlayPause());
         b.ivNext.setOnClickListener(v -> host().onNextTrackRequested());
         b.ivPrev.setOnClickListener(v -> host().onPreviousTrackRequested());
@@ -208,8 +209,8 @@ public class NowPlayingDialog extends DialogFragment implements LyricsContract.V
                 dismiss();
                 return;
             }
-            String trackKey = s.isLocal ? "local:" + s.localPath : "online:" + s.videoId;
-            if (!TextUtils.equals(lastLoadedTrackKey, trackKey)) {
+            String trackKey = (s.isLocal ? "local:" + s.localPath : "online:" + s.videoId) + "|" + s.title;
+            if (!TextUtils.equals(lastLoadedTrackKey, trackKey) || s.parsedLyrics == null) {
                 lastLoadedTrackKey = trackKey;
                 checkAndFetchLyricsForCurrentTrack(s);
             }
@@ -230,6 +231,11 @@ public class NowPlayingDialog extends DialogFragment implements LyricsContract.V
                 shown = s.parsedLyrics;
                 adapter.setData(shown);
                 curIdx = -1;
+                if (shown != null && !shown.isEmpty()) {
+                    curIdx = 0;
+                    adapter.setCurrent(0);
+                    centerOn(0);
+                }
             }
             boolean hasLyrics = shown != null && !shown.isEmpty();
             boolean isLoading = b.shimmerAnimationLyrics.getVisibility() == View.VISIBLE;
@@ -240,10 +246,11 @@ public class NowPlayingDialog extends DialogFragment implements LyricsContract.V
             if (hasLyrics) {
                 long t = (long) (s.positionSec * 1000) + s.lyricsOffsetMs;
                 int idx = findIndex(shown, t);
+                if (idx < 0) idx = 0;
                 if (idx != curIdx) {
                     curIdx = idx;
                     adapter.setCurrent(idx);
-                    if (idx >= 0) centerOn(idx);
+                    centerOn(idx);
                 }
             }
 
@@ -266,24 +273,29 @@ public class NowPlayingDialog extends DialogFragment implements LyricsContract.V
 
         if (s.queueIndex >= 0 && s.queueIndex < s.queue.size()) {
             PlayerState.Item item = s.queue.get(s.queueIndex);
-            if (item != null) {
-                if (!TextUtils.isEmpty(item.name)) title = item.name;
-                if (!TextUtils.isEmpty(item.artist)) artist = item.artist;
+            if (item != null && !TextUtils.isEmpty(item.name) && item.name.trim().equalsIgnoreCase(title.trim())) {
+                if (!TextUtils.isEmpty(item.artist)) {
+                    artist = item.artist;
+                }
             }
+        }
+
+        if ("Downloaded Track".equalsIgnoreCase(artist.trim())
+                || "Unknown Artist".equalsIgnoreCase(artist.trim())) {
+            artist = "";
         }
 
         String musicTitle = cleanMusicTitle(title);
 
         if (lyricsDatabaseHelper != null) {
             LyricsDatabaseHelper.CachedLyrics cached = lyricsDatabaseHelper.getLyrics(artist, musicTitle);
-            if (cached == null) {
+            if (cached == null && TextUtils.isEmpty(artist)) {
                 cached = lyricsDatabaseHelper.getLyricsByMusicName(musicTitle);
             }
             if (cached == null) {
                 clearCurrentLyrics();
                 if (isNetworkAvailable() && lyricsPresenter != null) {
                     int durationInt = (int) s.durationSec;
-                    b.rvLyrics.scrollToPosition(0);
                     reqArtist = artist;
                     reqTitle = musicTitle;
                     lyricsPresenter.getLyrics(musicTitle, artist, durationInt);
@@ -369,6 +381,15 @@ public class NowPlayingDialog extends DialogFragment implements LyricsContract.V
         s.setLyrics(syncedLyrics);
         s.setDuration(duration);
         s.lyricsDurationSec = (float) duration;
+
+        long offsetMs = 0;
+        if (s.lyricsDurationSec > 0 && s.durationSec > 0) {
+            float diff = s.durationSec - s.lyricsDurationSec;
+            if (Math.abs(diff) >= 0.5f && Math.abs(diff) <= 15f) {
+                offsetMs = (long) (-diff * 1000);
+            }
+        }
+        s.lyricsOffsetMs = offsetMs;
     }
 
     private static String plainToLrc(String plain, double durationSec) {

@@ -29,6 +29,7 @@ import com.yt.downloader.spogify.Utils.Image.DeezerApiArtist;
 import com.yt.downloader.spogify.Utils.download.DownloadTrackModel;
 import com.yt.downloader.spogify.Utils.db.FavoriteDatabaseHelper;
 import com.yt.downloader.spogify.Utils.db.FollowDatabaseHelper;
+import com.yt.downloader.spogify.Utils.db.QueueDatabaseHelper;
 import com.yt.downloader.spogify.Utils.FormatCountUtil;
 import com.yt.downloader.spogify.Utils.lyrics.PlayerState;
 import com.yt.downloader.spogify.Utils.WindowUtils;
@@ -348,6 +349,9 @@ public class TrackInfoActivity extends MiniPlayerActivity implements View.OnClic
     private void startDownloadFlow(TrackInfoBean.Track track) {
         isDownloadingProcess = true;
         currentDownloadTrack = track;
+        if (currentSheet != null && currentSheet.isAdded()) {
+            currentSheet.setDownloading(true, 0);
+        }
         String searchQuery = buildSearchQuery(track);
         musicListPresenter.getSearchListQuery(searchQuery);
     }
@@ -660,6 +664,10 @@ public class TrackInfoActivity extends MiniPlayerActivity implements View.OnClic
         if (hud != null) {
             hud.dismiss();
         }
+        isDownloadingProcess = false;
+        if (currentSheet != null && currentSheet.isAdded()) {
+            currentSheet.setDownloading(false, 0);
+        }
         if (!mainDestroyed) {
 //            Toast.makeText(getApplicationContext(),"Lyrics not found",Toast.LENGTH_SHORT).show();
 //            Log.e("LYRICS_DEBUG", "Lyrics error: " + error);
@@ -697,6 +705,10 @@ public class TrackInfoActivity extends MiniPlayerActivity implements View.OnClic
                 playVideoInMiniPlayer(item.getId(), displayTitle, item.getThumbnail());
             }
         } else {
+            isDownloadingProcess = false;
+            if (currentSheet != null && currentSheet.isAdded()) {
+                currentSheet.setDownloading(false, 0);
+            }
             Toast.makeText(this, "Track not found on YouTube", LENGTH_SHORT).show();
         }
     }
@@ -717,6 +729,9 @@ public class TrackInfoActivity extends MiniPlayerActivity implements View.OnClic
                         if (trackInfoAdapter != null) {
                             trackInfoAdapter.updateDownloadProgress(trackName, progress);
                         }
+                        if (currentSheet != null && currentSheet.isAdded()) {
+                            currentSheet.setDownloading(true, progress);
+                        }
                     });
                 }
 
@@ -726,6 +741,9 @@ public class TrackInfoActivity extends MiniPlayerActivity implements View.OnClic
                         if (currentSheet != null && currentSheet.isAdded()) {
                             currentSheet.bindTrack(currentDownloadTrack);
                         }
+                        if (trackInfoAdapter != null) {
+                            trackInfoAdapter.notifyDataSetChanged();
+                        }
                         Toast.makeText(TrackInfoActivity.this, "Saved to Music/downloaded_music: " + filePath, Toast.LENGTH_LONG).show();
                     });
                 }
@@ -734,12 +752,18 @@ public class TrackInfoActivity extends MiniPlayerActivity implements View.OnClic
                 public void onError(String error) {
                     new Handler(Looper.getMainLooper()).post(() -> {
                         isDownloadingProcess = false;
+                        if (currentSheet != null && currentSheet.isAdded()) {
+                            currentSheet.setDownloading(false, 0);
+                        }
                         Toast.makeText(TrackInfoActivity.this, "Download Error: " + error, LENGTH_SHORT).show();
                     });
                 }
             });
         } else {
             isDownloadingProcess = false;
+            if (currentSheet != null && currentSheet.isAdded()) {
+                currentSheet.setDownloading(false, 0);
+            }
             Toast.makeText(this, "Failed to resolve download link", LENGTH_SHORT).show();
         }
     }
@@ -805,6 +829,7 @@ public class TrackInfoActivity extends MiniPlayerActivity implements View.OnClic
             s.queue.add(new PlayerState.Item(name, artist, "", t.getImageUrl(), path));
         }
         s.queueIndex = currentPlayingIndex;
+        new QueueDatabaseHelper(this).replaceQueue(s.queue);
     }
 
 

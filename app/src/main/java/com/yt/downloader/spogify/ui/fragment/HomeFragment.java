@@ -108,6 +108,10 @@ public class HomeFragment extends Fragment implements HomeContract.View {
 
     private void hideShimmer() {
         if (binding == null) return;
+        binding.llTopArtist.setVisibility(topArtistList.isEmpty() ? View.GONE : View.VISIBLE);
+        binding.llTopTracks.setVisibility(topTrackList.isEmpty() ? View.GONE : View.VISIBLE);
+        binding.llOpm.setVisibility(opmList.isEmpty() ? View.GONE : View.VISIBLE);
+        binding.llRnb.setVisibility(RnbList.isEmpty() ? View.GONE : View.VISIBLE);
         binding.shimmerHome.setVisibility(View.GONE);
     }
 
@@ -269,7 +273,7 @@ public class HomeFragment extends Fragment implements HomeContract.View {
         try {
             hideShimmer();
             binding.swipeRefresh.setRefreshing(false);
-        }catch (Exception e){
+        } catch (Exception e) {
             e.printStackTrace();
         }
     }
@@ -277,9 +281,14 @@ public class HomeFragment extends Fragment implements HomeContract.View {
     @Override
     public void hideLoading() {
         try {
-            hideShimmer();
-            binding.swipeRefresh.setRefreshing(false);
-        }catch (Exception e){
+            new Handler(Looper.getMainLooper()).postDelayed(new Runnable() {
+                @Override
+                public void run() {
+                    hideShimmer();
+                    binding.swipeRefresh.setRefreshing(false);
+                }
+            }, 600);
+        } catch (Exception e) {
             e.printStackTrace();
         }
 
@@ -288,63 +297,47 @@ public class HomeFragment extends Fragment implements HomeContract.View {
     @Override
     public void getTopArtistSuccess(TopArtistBean bean) {
         if (binding == null) return;
-        binding.swipeRefresh.setRefreshing(false);
         if (bean != null && bean.getArtists() != null && bean.getArtists().getArtist() != null
                 && !bean.getArtists().getArtist().isEmpty()) {
             topArtistList.clear();
             topArtistList.addAll(bean.getArtists().getArtist());
             topArtistAdapter.setNewData(topArtistList);
-            binding.llTopArtist.setVisibility(View.VISIBLE);
-        } else {
-            binding.llTopArtist.setVisibility(View.GONE);
         }
     }
 
     @Override
     public void getTopTracksSuccess(TopTrackBean topTrackBean) {
         if (binding == null) return;
-        binding.swipeRefresh.setRefreshing(false);
         if (topTrackBean != null && topTrackBean.getTracks() != null
                 && topTrackBean.getTracks().getTrack() != null
                 && !topTrackBean.getTracks().getTrack().isEmpty()) {
             topTrackList.clear();
             topTrackList.addAll(topTrackBean.getTracks().getTrack());
             topTrackAdapter.setNewData(topTrackList);
-            binding.llTopTracks.setVisibility(View.VISIBLE);
-        } else {
-            binding.llTopTracks.setVisibility(View.GONE);
         }
     }
 
     @Override
     public void getOpmSuccess(OpmBean opmBean) {
         if (binding == null) return;
-        binding.swipeRefresh.setRefreshing(false);
         if (opmBean != null && opmBean.getTopArtists() != null
                 && opmBean.getTopArtists().getArtist() != null
                 && !opmBean.getTopArtists().getArtist().isEmpty()) {
             opmList.clear();
             opmList.addAll(opmBean.getTopArtists().getArtist());
             opmAdapter.setNewData(opmList);
-            binding.llOpm.setVisibility(View.VISIBLE);
-        } else {
-            binding.llOpm.setVisibility(View.GONE);
         }
     }
 
     @Override
     public void getRnBSuccess(RAndBbean rAndBbean) {
         if (binding == null) return;
-        binding.swipeRefresh.setRefreshing(false);
         if (rAndBbean != null && rAndBbean.getTopArtists() != null
                 && rAndBbean.getTopArtists().getArtist() != null
                 && !rAndBbean.getTopArtists().getArtist().isEmpty()) {
             RnbList.clear();
             RnbList.addAll(rAndBbean.getTopArtists().getArtist());
             rnBAdapter.setNewData(RnbList);
-            binding.llRnb.setVisibility(View.VISIBLE);
-        } else {
-            binding.llRnb.setVisibility(View.GONE);
         }
     }
 
@@ -353,7 +346,8 @@ public class HomeFragment extends Fragment implements HomeContract.View {
         if (connectivityManager != null && networkCallback != null) {
             try {
                 connectivityManager.unregisterNetworkCallback(networkCallback);
-            } catch (Exception ignored) { }
+            } catch (Exception ignored) {
+            }
             networkCallback = null;
         }
         super.onDestroyView();

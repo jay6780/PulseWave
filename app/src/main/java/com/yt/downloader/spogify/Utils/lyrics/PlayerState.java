@@ -27,13 +27,12 @@ public class PlayerState {
             this.localPath = localPath == null ? "" : localPath;
         }
 
-        public Item(String name, String artist, String videoId, String thumb, String localPath, List<LrcParser.Line> parsedLyrics) {
-            this.name = name == null ? "" : name;
-            this.artist = artist == null ? "" : artist;
-            this.videoId = videoId == null ? "" : videoId;
-            this.thumb = thumb == null ? "" : thumb;
-            this.localPath = localPath == null ? "" : localPath;
-            this.parsedLyrics = parsedLyrics == null ? new ArrayList<>() : parsedLyrics;
+        public String getName() {
+            return name;
+        }
+
+        public void setName(String name) {
+            this.name = name;
         }
     }
 

@@ -204,6 +204,7 @@ public class PlaybackService extends Service {
         PlayerState s = PlayerState.get();
         s.isPlaying = false;
         s.hasTrack = false;
+        s.queue.clear();
         s.resumeOnRestore = false;
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
@@ -357,13 +358,16 @@ public class PlaybackService extends Service {
 
     @Override
     public void onDestroy() {
-        started = false;
-        thumbnail = null;
-        if (mediaSession != null) {
-            mediaSession.setActive(false);
-            mediaSession.release();
-        }
         super.onDestroy();
+        PlayerState s = PlayerState.get();
+        if (s != null && s.queue.isEmpty()) {
+            started = false;
+            thumbnail = null;
+            if (mediaSession != null) {
+                mediaSession.setActive(false);
+                mediaSession.release();
+            }
+        }
     }
 
     @Nullable

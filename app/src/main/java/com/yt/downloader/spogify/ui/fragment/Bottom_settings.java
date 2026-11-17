@@ -21,8 +21,12 @@ import com.yt.downloader.R;
 import com.yt.downloader.databinding.FragmentBottomSettingsBinding;
 import com.yt.downloader.spogify.Utils.db.FavoriteDatabaseHelper;
 import com.yt.downloader.spogify.Utils.db.LyricsDatabaseHelper;
+import com.yt.downloader.spogify.Utils.db.QueueDatabaseHelper;
 import com.yt.downloader.spogify.Utils.fileUtils.FilesExtractor;
+import com.yt.downloader.spogify.Utils.lyrics.PlayerState;
 import com.yt.downloader.spogify.mvp.bean.TrackInfoBean;
+
+import java.io.File;
 
 public class Bottom_settings extends BottomSheetDialogFragment implements View.OnClickListener {
 
@@ -31,7 +35,10 @@ public class Bottom_settings extends BottomSheetDialogFragment implements View.O
     private BottomSheetActionListener actionListener;
     private FavoriteDatabaseHelper favDbHelper;
     private LyricsDatabaseHelper lyricsDatabaseHelper;
+    private QueueDatabaseHelper queueDbHelper;
     private FilesExtractor filesExtractor;
+    private boolean isDownloading = false;
+    private int downloadProgress = 0;
 
 
     public interface BottomSheetActionListener {
@@ -58,6 +65,16 @@ public class Bottom_settings extends BottomSheetDialogFragment implements View.O
      */
     public void bindTrack(TrackInfoBean.Track track) {
         this.currentTrack = track;
+        this.isDownloading = false;
+        this.downloadProgress = 0;
+        if (binding != null) {
+            refreshUi();
+        }
+    }
+
+    public void setDownloading(boolean downloading, int progress) {
+        this.isDownloading = downloading;
+        this.downloadProgress = progress;
         if (binding != null) {
             refreshUi();
         }
@@ -75,10 +92,12 @@ public class Bottom_settings extends BottomSheetDialogFragment implements View.O
 
         favDbHelper = new FavoriteDatabaseHelper(requireContext());
         lyricsDatabaseHelper = new LyricsDatabaseHelper(requireContext());
+        queueDbHelper = new QueueDatabaseHelper(requireContext());
         filesExtractor = new FilesExtractor(requireContext());
         binding.llFavorites.setOnClickListener(this);
         binding.llDownload.setOnClickListener(this);
         binding.llRefreshLyrics.setOnClickListener(this);
+        binding.llAddToQueue.setOnClickListener(this);
         binding.ivDismiss.setOnClickListener(this);
 
         refreshUi();
@@ -109,14 +128,21 @@ public class Bottom_settings extends BottomSheetDialogFragment implements View.O
 
         // Download state
         boolean isDownloaded = filesExtractor.isFileDownloaded(currentTrack.getName());
-        if (isDownloaded) {
+        if (isDownloading) {
+            binding.ivDownload.setImageResource(android.R.drawable.stat_sys_download);
+            binding.ivDownload.setColorFilter(Color.parseColor("#B3B3B3"));
+            binding.tvDownload.setText(downloadProgress > 0
+                    ? "Downloading... " + downloadProgress + "%"
+                    : "Preparing download...");
+        } else if (isDownloaded) {
             binding.ivDownload.setImageResource(R.drawable.baseline_delete_24);
             binding.ivDownload.setColorFilter(Color.parseColor("#B3B3B3"));
+            binding.tvDownload.setText("Downloaded");
         } else {
             binding.ivDownload.setImageResource(android.R.drawable.stat_sys_download);
             binding.ivDownload.setColorFilter(Color.parseColor("#B3B3B3"));
+            binding.tvDownload.setText("Not downloaded");
         }
-        binding.tvDownload.setText(isDownloaded ? "Downloaded" : "Not downloaded");
         binding.tvFavorites.setText(isFavorite ? "Added to favorites" : "Add to favorites");
 
 
@@ -150,7 +176,7 @@ public class Bottom_settings extends BottomSheetDialogFragment implements View.O
             }
             refreshUi();
         } else if (v.getId() == R.id.ll_download) {
-            if (currentTrack == null) return;
+            if (currentTrack == null || isDownloading) return;
             if (actionListener != null) {
                 actionListener.onDownloadClicked(currentTrack);
             }
@@ -166,6 +192,46 @@ public class Bottom_settings extends BottomSheetDialogFragment implements View.O
                 return;
             }
             showRefreshDialog(currentTrack.getName(), artist);
+        } else if (v.getId() == R.id.ll_add_to_queue) {
+            if (currentTrack == null) return;
+            String trackName = currentTrack.getName() == null ? "" : currentTrack.getName().trim();
+            boolean alreadyInQueue = queueDbHelper.isTrackInQueue(trackName);
+            if (!alreadyInQueue) {
+                for (PlayerState.Item qItem : PlayerState.get().queue) {
+                    if (qItem != null && qItem.name != null && qItem.name.trim().equalsIgnoreCase(trackName)) {
+                        alreadyInQueue = true;
+                        break;
+                    }
+                }
+            }
+
+            if (alreadyInQueue) {
+                Toast.makeText(getContext(), "Already in quelist", Toast.LENGTH_SHORT).show();
+            } else {
+                String artist = (currentTrack.getArtist() != null
+                        && !TextUtils.isEmpty(currentTrack.getArtist().getName()))
+                        ? currentTrack.getArtist().getName() : "";
+                String localPath = "";
+                if (filesExtractor != null && filesExtractor.isFileDownloaded(trackName)) {
+                    File f = filesExtractor.getDownloadedFile(trackName);
+                    if (f != null) {
+                        localPath = f.getAbsolutePath();
+                    }
+                }
+                PlayerState.Item newItem = new PlayerState.Item(
+                        trackName,
+                        artist,
+                        "",
+                        currentTrack.getImageUrl(),
+                        localPath
+                );
+                queueDbHelper.addQueueTrack(newItem);
+                PlayerState.get().queue.add(newItem);
+                Toast.makeText(getContext(), "Added to quelist", Toast.LENGTH_SHORT).show();
+            }
+            androidx.fragment.app.FragmentManager fm = getParentFragmentManager();
+            dismissAllowingStateLoss();
+            Bottom_queue_list.newInstance().show(fm, "bottom_queue_list");
         } else if (v.getId() == R.id.iv_dismiss) {
             dismissAllowingStateLoss();
         }
@@ -194,7 +260,13 @@ public class Bottom_settings extends BottomSheetDialogFragment implements View.O
         btnOk.setOnClickListener(v -> {
             dialog.dismiss();
             dismissAllowingStateLoss();
-            lyricsDatabaseHelper.deleteLyrics(artistName,trackName);
+            lyricsDatabaseHelper.deleteLyrics(artistName, trackName);
+            PlayerState state = PlayerState.get();
+            if (state.hasTrack && !TextUtils.isEmpty(state.title) && state.title.equalsIgnoreCase(trackName)) {
+                state.parsedLyrics = null;
+                state.lyrics = "";
+                state.lyricsDurationSec = 0f;
+            }
             Toast.makeText(getContext(),"Done refresh please check lyrics again!",Toast.LENGTH_SHORT).show();
         });
 
