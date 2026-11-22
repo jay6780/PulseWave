@@ -227,11 +227,6 @@ public class Bottom_queue_list extends BottomSheetDialogFragment {
             }
 
             @Override
-            public boolean isLongPressDragEnabled() {
-                return true;
-            }
-
-            @Override
             public void clearView(@NonNull RecyclerView recyclerView, @NonNull RecyclerView.ViewHolder viewHolder) {
                 super.clearView(recyclerView, viewHolder);
                 if (queueDbHelper != null) {
@@ -247,20 +242,29 @@ public class Bottom_queue_list extends BottomSheetDialogFragment {
     private void refreshUi() {
         if (binding == null) return;
         PlayerState state = PlayerState.get();
-        String nowTitle = cleanMusicTitle(state.title);
+        String nowTitle = state.title;
         String nowArtist = state.artist;
         String nowThumb = state.thumb;
 
-        if ((!state.hasTrack || TextUtils.isEmpty(nowTitle)) && !state.queue.isEmpty()) {
-            int idx = (state.queueIndex >= 0 && state.queueIndex < state.queue.size()) ? state.queueIndex : 0;
-            PlayerState.Item fallback = state.queue.get(idx);
-            if (fallback != null) {
-                nowTitle = cleanMusicTitle(fallback.name);
-                nowArtist = fallback.artist;
-                nowThumb = fallback.thumb;
+        if (state.queueIndex >= 0 && state.queueIndex < state.queue.size()) {
+            PlayerState.Item activeItem = state.queue.get(state.queueIndex);
+            if (activeItem != null && !TextUtils.isEmpty(activeItem.name)) {
+                boolean matchesActive = !state.hasTrack
+                        || TextUtils.isEmpty(nowTitle)
+                        || (state.isLocal && !TextUtils.isEmpty(state.localPath) && state.localPath.equals(activeItem.localPath))
+                        || (!state.isLocal && !TextUtils.isEmpty(state.videoId) && state.videoId.equals(activeItem.videoId))
+                        || nowTitle.toLowerCase().contains(activeItem.name.toLowerCase());
+                if (matchesActive) {
+                    nowTitle = activeItem.name;
+                    if (!TextUtils.isEmpty(activeItem.artist)) {
+                        nowArtist = activeItem.artist;
+                    }
+                    if (!TextUtils.isEmpty(activeItem.thumb)) {
+                        nowThumb = activeItem.thumb;
+                    }
+                }
             }
         }
-        state.title = nowTitle;
 
         if (!TextUtils.isEmpty(nowTitle)) {
             binding.llNowPlaying.setVisibility(View.VISIBLE);
@@ -303,22 +307,6 @@ public class Bottom_queue_list extends BottomSheetDialogFragment {
             adapter.notifyDataSetChanged();
         }
     }
-
-    private String cleanMusicTitle(String title) {
-        if (TextUtils.isEmpty(title)) return "";
-        String clean = title.trim();
-        String junk = "official|lyrics?|audio|video|visualizer|remaster(ed)?|feat\\.?|ft\\.?";
-        clean = clean.replaceAll("(?i)\\([^)]*(" + junk + ")[^)]*\\)", "");
-        clean = clean.replaceAll("(?i)\\[[^]]*(" + junk + ")[^]]*\\]", "");
-        if (clean.contains(" - ")) {
-            String[] parts = clean.split(" - ", 2);
-            clean = parts[1].trim();
-        }
-        clean = clean.replaceAll("(?i)\\s+(official\\s+)?(lyrics?|music video|audio|visualizer)\\s*$", "");
-        return clean.trim();
-    }
-
-
     private void registerNetworkCallback() {
         connectivityManager = (ConnectivityManager) requireContext().getSystemService(Context.CONNECTIVITY_SERVICE);
         if (connectivityManager == null) return;

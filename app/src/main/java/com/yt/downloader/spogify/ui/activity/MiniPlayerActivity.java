@@ -24,7 +24,6 @@ import com.pierfrancescosoffritti.androidyoutubeplayer.core.player.views.YouTube
 import com.yt.downloader.R;
 import com.yt.downloader.databinding.LayoutMiniPlayerBinding;
 import com.yt.downloader.spogify.Service.PlaybackService;
-import com.yt.downloader.spogify.Utils.lyrics.KaraokeLyricsController;
 import com.yt.downloader.spogify.Utils.lyrics.LocalAudioPlayer;
 import com.yt.downloader.spogify.Utils.lyrics.PlayerState;
 import com.yt.downloader.spogify.mvp.bean.YoutubeSearchBean;
@@ -139,7 +138,8 @@ public abstract class MiniPlayerActivity extends AppCompatActivity {
             pendingSearchItem = null;
             it.videoId = b.getId();
             it.thumb = b.getThumbnail();
-            playOnline(b.getId(), b.getTitle(), it.artist, b.getThumbnail());
+            String displayTitle = !TextUtils.isEmpty(it.name) ? it.name : b.getTitle();
+            playOnline(b.getId(), displayTitle, it.artist, b.getThumbnail());
         }
     };
 
