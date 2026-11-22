@@ -392,51 +392,6 @@ public class NowPlayingDialog extends DialogFragment implements LyricsContract.V
         s.lyricsOffsetMs = offsetMs;
     }
 
-    private static String plainToLrc(String plain, double durationSec) {
-        if (TextUtils.isEmpty(plain)) return "";
-        String[] lines = plain.split("\n");
-
-        int nonEmpty = 0;
-        int totalWeight = 0;
-        for (String l : lines) {
-            String t = l.trim();
-            if (!t.isEmpty()) {
-                nonEmpty++;
-                totalWeight += Math.max(1, t.length());
-            }
-        }
-        if (nonEmpty == 0) return plain;
-
-        double leadIn = 1.0;
-        double tail = 2.0;
-        double usable = durationSec > leadIn + tail
-                ? durationSec - leadIn - tail
-                : (durationSec > 0 ? durationSec : nonEmpty * 2.0);
-
-        double perWeight = usable / totalWeight;
-
-        StringBuilder sb = new StringBuilder();
-        double t = leadIn;
-        for (String l : lines) {
-            String text = l.trim();
-            if (text.isEmpty()) {
-                sb.append('\n');
-                continue;
-            }
-            int totalSec = (int) t;
-            int min = totalSec / 60;
-            double sec = t - min * 60;
-            if (sec >= 60.0) {
-                min++;
-                sec -= 60.0;
-            }
-            if (sec < 0) sec = 0;
-            sb.append(String.format(Locale.US, "[%02d:%05.2f] %s\n", min, sec, text));
-
-            t += perWeight * Math.max(1, text.length());
-        }
-        return sb.toString();
-    }
 
     private final Runnable hideShimmerRunnable = () -> {
         try {
